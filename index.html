@@ -174,7 +174,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 #writebar .wb-confirm:hover{background:#185FA5}
 
 /* ══ MOBILE VIEW (≤ 680px) ══════════════════════════════════════════════════ */
-@media (max-width:680px){
+@media (max-width:812px){
   body{height:100dvh;overflow:hidden;display:flex;flex-direction:column}
   /* Slim single-row topbar */
   .topbar{padding:0 12px;height:44px;flex-wrap:nowrap;gap:0}
@@ -187,7 +187,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
   /* hamburger always visible */
   #mb-hamburger{display:flex !important}
 }
-@media (min-width:681px){
+@media (min-width:813px){
   #mobile-panel{display:none !important}
   #mb-hamburger{display:none !important}
   #mb-drawer{display:none !important}
@@ -251,7 +251,27 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 /* Task list */
 #mobile-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 
-.mb-stage{
+.mb-day{
+  display:flex;align-items:baseline;gap:8px;
+  padding:10px 12px 6px;
+  background:var(--bg);
+  border-bottom:1.5px solid var(--border-strong);
+  position:sticky;top:0;z-index:20;
+}
+.mb-day-name{font-size:13px;font-weight:700;color:var(--text)}
+.mb-day-date{font-size:11px;color:var(--text-hint)}
+.mb-day-h{font-size:11px;color:var(--text-sec);margin-left:auto}
+.mb-day.is-today .mb-day-name{color:var(--today)}
+.mb-day.is-today .mb-day-date{color:var(--today)}
+.mb-day.is-today{border-bottom-color:var(--today)}
+.mb-day-stage{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 12px 4px 20px;
+  background:var(--bg);
+  border-bottom:0.5px solid var(--border);
+}
+.mb-day-stage-num{font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;color:#fff;flex-shrink:0}
+.mb-day-stage-name{font-size:11px;color:var(--text-sec);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   display:flex;align-items:center;gap:8px;
   padding:8px 12px;background:var(--bg);
   border-bottom:0.5px solid var(--border-strong);
@@ -794,7 +814,6 @@ function render(){
       labelHTML+=`<div class="label-row" style="height:${ROW_H}px" draggable="true" data-etap="${step.etap}" data-item="${step.item}" data-opis="${step.opis.replace(/`/g,'\\`')}">
         <div class="task-label" style="width:var(--label)">
           <div class="task-icons">
-            <span class="sdot ${dotCls}" title="${step.status}"></span>
             ${step.tenTydzen==='TAK'?'<span class="tw-star" title="This week"></span>':''}
           </div>
           <span class="task-text${isUrgent?' urgent':''}" title="${step.opis}">${step.opis}</span>
@@ -1393,7 +1412,11 @@ function initSplitter(){
 }
 
 // ── MOBILE ────────────────────────────────────────────────────────────────────
-function isMobile(){ return window.innerWidth <= 680; }
+function isMobile(){
+  // Use the smaller of width/height so landscape phones still get mobile view
+  return Math.min(window.screen.width, window.screen.height) <= 430
+      || window.innerWidth <= 680;
+}
 
 // Mobile filter state — independent of desktop filters
 const mbFilter = { etap: '', status: '', tydzen: '' };
@@ -1470,6 +1493,8 @@ function initChips(){
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
+const DOW_FULL_PL = ['Niedziela','Poniedziałek','Wtorek','Środa','Czwartek','Piątek','Sobota'];
+
 function renderMobile(){
   if(!isMobile()) return;
   const schedTasks=[];
@@ -1489,53 +1514,101 @@ function renderMobile(){
     `<span>${scheduled.length} tasks · ${totalH.toFixed(1)}h</span>`+
     (lastDate?`<span>Done by: <strong>${fmtLong(lastDate)}</strong></span>`:'');
 
-  const stageMap={};
-  scheduled.forEach(t=>{ if(!stageMap[t.etap])stageMap[t.etap]=[]; stageMap[t.etap].push(t); });
-  const stageOrder=getStages().filter(s=>(!mbFilter.etap||String(s.etap)===mbFilter.etap)&&stageMap[s.etap]);
+  const today=new Date(); today.setHours(0,0,0,0);
+  const stageNameMap={};
+  getStages().forEach(s=>{ stageNameMap[s.etap]=s.opis; });
 
-  const statusCls={'Zrobione':'ms-done','W toku':'ms-wip','Zablokowane':'ms-blocked','Do zrobienia':'ms-todo','W formułowaniu':'ms-form'};
-  let html='';
-  stageOrder.forEach(stage=>{
-    const sc=STAGE_COLORS[stage.etap]||'#888';
-    const tasks=(stageMap[stage.etap]||[]).slice().sort((a,b)=>Number(a.item)-Number(b.item));
-    const stageH=tasks.reduce((s,t)=>s+(t.czas||0),0);
-    html+=`<div class="mb-stage">
-      <span class="mb-stage-num" style="background:${sc}">${stage.etap}</span>
-      <span class="mb-stage-name">${stage.opis}</span>
-      <span class="mb-stage-h">${stageH.toFixed(1)}h</span>
-    </div>`;
-    tasks.forEach(task=>{
-      const sc2=STAGE_COLORS[task.etap]||'#888';
-      const isUrgent=task.priorytet==='Pilne';
-      const scls=statusCls[task.status]||'ms-todo';
-      const startStr=task.startDate?fmtDD(task.startDate):'—';
-      const endStr=task.endDate?fmtDD(task.endDate):'—';
-      const dateStr=task.startDate?(fmtISO(task.startDate)===fmtISO(task.endDate)?startStr:startStr+' – '+endStr):'—';
-      const barColor=task.status==='Zablokowane'?'#b01a1a':sc2;
-      html+=`<div class="mb-task">
-        <div class="mb-task-bar" style="background:${barColor}"></div>
-        <div class="mb-task-body">
-          <div class="mb-task-name${isUrgent?' urgent':''}">
-            ${task.tenTydzen==='TAK'?'<span class="mb-tw"></span> ':''}${task.opis}
-          </div>
-          <div class="mb-task-meta">
-            <span class="badge b-${task.typ}">${task.typ}</span>
-            <span class="mb-status ${scls}">${task.status}</span>
-            <span class="mb-date">📅 ${dateStr}</span>
-          </div>
-        </div>
-        <div class="mb-task-right">
-          <span class="mb-hours">${task.czas}h</span>
-          <span class="mb-item-num">#${task.item}</span>
-        </div>
-      </div>`;
+  // ── Build day→stage→tasks map ─────────────────────────────────────────────
+  // Each scheduled task has segs[]; use startDate as the primary day key.
+  // Tasks spanning multiple days appear under each day they touch.
+  const dayMap={}; // dateISO → { etap → [task] }
+  scheduled.forEach(task=>{
+    if(!task.segs) return;
+    const seenDays=new Set();
+    task.segs.forEach(seg=>{
+      const dk=fmtISO(seg.date);
+      if(seenDays.has(dk)) return;
+      seenDays.add(dk);
+      if(!dayMap[dk]) dayMap[dk]={};
+      if(!dayMap[dk][task.etap]) dayMap[dk][task.etap]=[];
+      dayMap[dk][task.etap].push({...task, _segHours: seg.hours});
     });
   });
-  if(!html) html='<div style="padding:32px 16px;text-align:center;color:var(--text-sec)">No tasks match.</div>';
+
+  // Sort days ascending (today first naturally)
+  const sortedDays=Object.keys(dayMap).sort();
+
+  const statusCls={'Zrobione':'ms-done','W toku':'ms-wip','Zablokowane':'ms-blocked','Do zrobienia':'ms-todo','W formułowaniu':'ms-form'};
+
+  let html='';
+  if(!sortedDays.length){
+    html='<div style="padding:32px 16px;text-align:center;color:var(--text-sec)">No tasks match.</div>';
+  }
+  sortedDays.forEach(dk=>{
+    const d=new Date(dk+'T00:00:00');
+    const isToday=dk===fmtISO(today);
+    const dayLabel=isToday?'Dziś — '+DOW_FULL_PL[d.getDay()]:DOW_FULL_PL[d.getDay()];
+    const cap=getDayAvail(dk);
+    const dayH=Object.values(dayMap[dk]).flat().reduce((s,t)=>s+(t._segHours||0),0);
+
+    html+=`<div class="mb-day${isToday?' is-today':''}">
+      <span class="mb-day-name">${dayLabel}</span>
+      <span class="mb-day-date">${fmtDD(d)}</span>
+      <span class="mb-day-h">${dayH.toFixed(1)}h / ${cap}h</span>
+    </div>`;
+
+    // Stages within this day, in stage order
+    const etapsToday=Object.keys(dayMap[dk]).map(Number).sort((a,b)=>a-b);
+    etapsToday.forEach(etap=>{
+      const sc=STAGE_COLORS[etap]||'#888';
+      const stageName=(stageNameMap[etap]||'').slice(0,32);
+
+      // Stage sub-header
+      if(!mbFilter.etap){ // only show stage header when not already filtered to one stage
+        html+=`<div class="mb-day-stage">
+          <span class="mb-day-stage-num" style="background:${sc}">E${etap}</span>
+          <span class="mb-day-stage-name">${stageName}</span>
+        </div>`;
+      }
+
+      // Tasks for this day+stage, sorted by Item #
+      const tasks=dayMap[dk][etap].slice().sort((a,b)=>Number(a.item)-Number(b.item));
+      tasks.forEach(task=>{
+        const isUrgent=task.priorytet==='Pilne';
+        const scls=statusCls[task.status]||'ms-todo';
+        const barColor=task.status==='Zablokowane'?'#b01a1a':sc;
+        // For multi-day tasks show today's hours vs total
+        const hoursLabel=task.segs.length>1
+          ?`${task._segHours.toFixed(1)}h / ${task.czas}h`
+          :`${task.czas}h`;
+
+        html+=`<div class="mb-task">
+          <div class="mb-task-bar" style="background:${barColor}"></div>
+          <div class="mb-task-body">
+            <div class="mb-task-name${isUrgent?' urgent':''}">
+              ${task.tenTydzen==='TAK'?'<span class="mb-tw"></span> ':''}${task.opis}
+            </div>
+            <div class="mb-task-meta">
+              <span class="badge b-${task.typ}">${task.typ}</span>
+              <span class="mb-status ${scls}">${task.status}</span>
+            </div>
+          </div>
+          <div class="mb-task-right">
+            <span class="mb-hours">${hoursLabel}</span>
+            <span class="mb-item-num">#${task.item}</span>
+          </div>
+        </div>`;
+      });
+    });
+  });
+
   document.getElementById('mobile-list').innerHTML=html;
 }
 
 window.addEventListener('resize',()=>{ if(isMobile()) renderMobile(); });
+window.addEventListener('orientationchange',()=>{
+  setTimeout(()=>{ if(isMobile()) renderMobile(); else render(); }, 150);
+});
 
 document.getElementById('prevWeek').addEventListener('click',()=>{viewWeekOffset--;render();});
 document.getElementById('nextWeek').addEventListener('click',()=>{viewWeekOffset++;render();});
