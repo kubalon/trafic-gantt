@@ -174,176 +174,115 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 #writebar .wb-confirm:hover{background:#185FA5}
 
 /* ══ MOBILE VIEW (≤ 680px) ══════════════════════════════════════════════════ */
-@media (max-width: 680px) {
-  body { height:auto; overflow:auto; font-size:14px; }
-
-  /* Topbar: stack title + buttons */
-  .topbar { padding:8px 12px; gap:8px; }
-  .topbar-title span { display:none; }
-  .topbar-right { gap:6px; flex-wrap:wrap; }
-  .sheets-link { display:none; } /* not useful on mobile */
-
-  /* Hide desktop-only panels */
-  .filterbar { display:none; }
-  .timebar   { display:none; }
-  .gantt-outer { display:none; }
-
-  /* Show mobile panel */
-  #mobile-panel { display:flex !important; }
+@media (max-width:680px){
+  body{height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+  /* Slim single-row topbar */
+  .topbar{padding:0 12px;height:44px;flex-wrap:nowrap;gap:0}
+  .topbar-title{font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar-title span{display:none}
+  .topbar-right{display:none}           /* all desktop btns hidden */
+  .filterbar,.timebar,.infobar{display:none}
+  .gantt-outer{display:none}
+  #mobile-panel{display:flex !important}
+  /* hamburger always visible */
+  #mb-hamburger{display:flex !important}
 }
 @media (min-width:681px){
-  #mobile-panel { display:none !important; }
+  #mobile-panel{display:none !important}
+  #mb-hamburger{display:none !important}
+  #mb-drawer{display:none !important}
 }
 
-/* Mobile panel layout */
-#mobile-panel {
-  flex-direction:column;
-  flex:1;
-  overflow:hidden;
+/* Hamburger button */
+#mb-hamburger{
   display:none;
-}
-#mobile-filter-bar {
-  display:flex;
-  gap:8px;
-  padding:8px 12px;
-  background:var(--surface);
-  border-bottom:0.5px solid var(--border);
+  align-items:center;justify-content:center;
+  width:36px;height:36px;margin-left:8px;
+  border:0.5px solid var(--border-strong);border-radius:var(--radius);
+  background:transparent;cursor:pointer;color:var(--text);font-size:18px;
   flex-shrink:0;
-  flex-wrap:wrap;
-  align-items:center;
 }
-#mobile-filter-bar select {
-  flex:1;
-  min-width:100px;
-  font-size:13px;
-  padding:6px 8px;
-  border:0.5px solid var(--border-strong);
-  border-radius:var(--radius);
-  background:var(--bg);
-  color:var(--text);
+
+/* Slide-down drawer */
+#mb-drawer{
+  position:fixed;top:44px;left:0;right:0;z-index:500;
+  background:var(--surface);border-bottom:1px solid var(--border-strong);
+  padding:12px;display:none;flex-direction:column;gap:10px;
+  box-shadow:0 6px 24px rgba(0,0,0,.18);
 }
-#mobile-filter-bar .mb-clear {
-  font-size:12px;
-  padding:6px 10px;
-  border:0.5px solid var(--border-strong);
-  border-radius:var(--radius);
-  background:transparent;
-  color:var(--text);
-  cursor:pointer;
-  white-space:nowrap;
+#mb-drawer.open{display:flex}
+.mb-drawer-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mb-drawer-label{font-size:10px;font-weight:600;color:var(--text-hint);
+  text-transform:uppercase;letter-spacing:.04em;width:60px;flex-shrink:0}
+.mb-drawer-btns{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.mb-drawer-btn{font-size:12px;padding:5px 10px;border:0.5px solid var(--border-strong);
+  border-radius:20px;background:transparent;cursor:pointer;color:var(--text);white-space:nowrap}
+.mb-drawer-btn:active,.mb-drawer-btn.active-btn{
+  background:var(--text);color:var(--surface);border-color:var(--text)}
+.mb-drawer-divider{height:0.5px;background:var(--border);margin:2px 0}
+.mb-drawer-actions{display:flex;gap:8px;flex-wrap:wrap}
+.mb-drawer-action{font-size:12px;padding:6px 12px;border:0.5px solid var(--border-strong);
+  border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text)}
+
+/* Mobile panel */
+#mobile-panel{flex-direction:column;flex:1;overflow:hidden;min-height:0;display:none}
+
+/* Chip filter bar — single scrollable row */
+#mb-chips{
+  display:flex;align-items:center;gap:6px;
+  padding:7px 12px;overflow-x:auto;flex-shrink:0;
+  background:var(--surface);border-bottom:0.5px solid var(--border);
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;
 }
-#mobile-infobar {
-  padding:6px 12px;
-  font-size:11px;
-  color:var(--text-sec);
-  background:var(--bg);
-  border-bottom:0.5px solid var(--border);
-  flex-shrink:0;
-  display:flex;
-  gap:12px;
-  flex-wrap:wrap;
-  align-items:center;
+#mb-chips::-webkit-scrollbar{display:none}
+.mb-chip{font-size:11px;padding:4px 10px;border:0.5px solid var(--border-strong);
+  border-radius:20px;background:transparent;cursor:pointer;
+  color:var(--text-sec);white-space:nowrap;flex-shrink:0}
+.mb-chip.on{background:var(--text);color:var(--surface);border-color:var(--text)}
+.mb-chip-sep{width:1px;height:16px;background:var(--border);flex-shrink:0;margin:0 2px}
+
+/* Infobar */
+#mobile-infobar{
+  padding:5px 12px;font-size:11px;color:var(--text-sec);
+  background:var(--bg);border-bottom:0.5px solid var(--border);
+  flex-shrink:0;display:flex;gap:12px;flex-wrap:wrap;align-items:center;
 }
-#mobile-list {
-  flex:1;
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-}
-.mb-stage {
-  display:flex;
-  align-items:center;
-  gap:8px;
-  padding:10px 12px 8px;
-  background:var(--bg);
+
+/* Task list */
+#mobile-list{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+.mb-stage{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;background:var(--bg);
   border-bottom:0.5px solid var(--border-strong);
-  position:sticky;
-  top:0;
-  z-index:10;
+  position:sticky;top:0;z-index:10;
 }
-.mb-stage-num {
-  font-size:11px;
-  font-weight:700;
-  padding:2px 7px;
-  border-radius:4px;
-  color:#fff;
-  flex-shrink:0;
-}
-.mb-stage-name {
-  font-size:13px;
-  font-weight:600;
-  color:var(--text);
-  flex:1;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.mb-stage-h {
-  font-size:11px;
-  color:var(--text-hint);
-  flex-shrink:0;
-}
-.mb-task {
-  display:flex;
-  align-items:flex-start;
-  gap:10px;
-  padding:11px 12px;
-  border-bottom:0.5px solid var(--border);
+.mb-stage-num{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;color:#fff;flex-shrink:0}
+.mb-stage-name{font-size:12px;font-weight:600;color:var(--text);flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mb-stage-h{font-size:11px;color:var(--text-hint);flex-shrink:0}
+
+.mb-task{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px 12px;border-bottom:0.5px solid var(--border);
   background:var(--surface);
 }
-.mb-task-bar {
-  width:4px;
-  border-radius:2px;
-  flex-shrink:0;
-  align-self:stretch;
-  min-height:32px;
-}
-.mb-task-body { flex:1; min-width:0; }
-.mb-task-name {
-  font-size:13px;
-  line-height:1.35;
-  color:var(--text);
-  margin-bottom:5px;
-}
-.mb-task-name.urgent { color:#993C1D; font-weight:500; }
-.mb-task-meta {
-  display:flex;
-  align-items:center;
-  gap:6px;
-  flex-wrap:wrap;
-}
-.mb-date {
-  font-size:11px;
-  color:var(--text-sec);
-}
-.mb-task-right {
-  display:flex;
-  flex-direction:column;
-  align-items:flex-end;
-  gap:5px;
-  flex-shrink:0;
-}
-.mb-hours {
-  font-size:12px;
-  font-weight:500;
-  color:var(--text-sec);
-}
-.mb-item-num {
-  font-size:10px;
-  color:var(--text-hint);
-}
-.mb-tw { width:7px;height:7px;border-radius:50%;background:#D4537E;display:inline-block;flex-shrink:0; }
-/* Status colours */
-.mb-status {
-  font-size:10px;
-  padding:1px 6px;
-  border-radius:3px;
-  font-weight:500;
-}
-.ms-done    { background:#d6f0b4;color:#3B6D11 }
-.ms-wip     { background:#FAEEDA;color:#854F0B }
-.ms-blocked { background:#fcd4d4;color:#A32D2D }
-.ms-todo    { background:var(--bg);color:var(--text-sec);border:0.5px solid var(--border-strong) }
-.ms-form    { background:#e8e6f9;color:#534AB7 }
+.mb-task-bar{width:4px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:28px}
+.mb-task-body{flex:1;min-width:0}
+.mb-task-name{font-size:13px;line-height:1.35;color:var(--text);margin-bottom:4px}
+.mb-task-name.urgent{color:#993C1D;font-weight:500}
+.mb-task-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.mb-date{font-size:11px;color:var(--text-sec)}
+.mb-task-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.mb-hours{font-size:12px;font-weight:500;color:var(--text-sec)}
+.mb-item-num{font-size:10px;color:var(--text-hint)}
+.mb-tw{width:7px;height:7px;border-radius:50%;background:#D4537E;display:inline-block;flex-shrink:0}
+.mb-status{font-size:10px;padding:1px 6px;border-radius:3px;font-weight:500}
+.ms-done{background:#d6f0b4;color:#3B6D11}
+.ms-wip{background:#FAEEDA;color:#854F0B}
+.ms-blocked{background:#fcd4d4;color:#A32D2D}
+.ms-todo{background:var(--bg);color:var(--text-sec);border:0.5px solid var(--border-strong)}
+.ms-form{background:#e8e6f9;color:#534AB7}
 
 </style>
 </head>
@@ -359,6 +298,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
     <button class="btn" id="reloadBtn">↻ Reload</button>
     <button class="btn" id="clearStorageBtn" title="Clear saved filters and hour overrides, then reload fresh">⚠ Reset storage</button>
     <button class="btn" id="setupBtn">⚙ Setup</button>
+  </div>
+  <!-- Mobile hamburger — hidden on desktop via CSS -->
+  <button id="mb-hamburger" aria-label="Menu">☰</button>
+</div>
+
+<!-- Mobile slide-down drawer -->
+<div id="mb-drawer">
+  <div class="mb-drawer-row">
+    <span class="mb-drawer-label">Stage</span>
+    <div class="mb-drawer-btns" id="mb-stage-btns"></div>
+  </div>
+  <div class="mb-drawer-divider"></div>
+  <div class="mb-drawer-row">
+    <span class="mb-drawer-label">Status</span>
+    <div class="mb-drawer-btns" id="mb-status-btns"></div>
+  </div>
+  <div class="mb-drawer-divider"></div>
+  <div class="mb-drawer-actions">
+    <button class="mb-drawer-action" id="mb-reload-btn">↻ Reload data</button>
+    <button class="mb-drawer-action" id="mb-clear-storage-btn">⚠ Reset storage</button>
+    <button class="mb-drawer-action" id="mb-setup-btn">⚙ Setup</button>
+    <button class="mb-drawer-action" id="mb-close-drawer" style="margin-left:auto">✕ Close</button>
   </div>
 </div>
 
@@ -381,17 +342,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 <!-- ══ MOBILE PANEL ═══════════════════════════════════════════════════════════ -->
 <div id="mobile-panel">
-  <div id="mobile-filter-bar">
-    <select id="mb-filter-etap"><option value="">All stages</option></select>
-    <select id="mb-filter-status">
-      <option value="">All statuses</option>
-      <option>Do zrobienia</option><option>W toku</option>
-      <option>Zablokowane</option><option>Zrobione</option><option>W formułowaniu</option>
-    </select>
-    <select id="mb-filter-tydzen">
-      <option value="">All</option><option value="TAK">This week</option>
-    </select>
-    <button class="mb-clear" id="mb-clear">✕</button>
+  <!-- Single-row scrollable chip filters -->
+  <div id="mb-chips">
+    <button class="mb-chip on" data-filter="tydzen" data-val="">All</button>
+    <button class="mb-chip" data-filter="tydzen" data-val="TAK">⭐ This week</button>
+    <div class="mb-chip-sep"></div>
+    <button class="mb-chip on" data-filter="status" data-val="">All statuses</button>
+    <button class="mb-chip" data-filter="status" data-val="Do zrobienia">To do</button>
+    <button class="mb-chip" data-filter="status" data-val="W toku">In progress</button>
+    <button class="mb-chip" data-filter="status" data-val="Zablokowane">Blocked</button>
+    <button class="mb-chip" data-filter="status" data-val="Zrobione">Done</button>
   </div>
   <div id="mobile-infobar"></div>
   <div id="mobile-list"></div>
@@ -1432,53 +1392,108 @@ function initSplitter(){
   },{passive:true});
 }
 
-// ── MOBILE RENDER ─────────────────────────────────────────────────────────────
+// ── MOBILE ────────────────────────────────────────────────────────────────────
 function isMobile(){ return window.innerWidth <= 680; }
 
+// Mobile filter state — independent of desktop filters
+const mbFilter = { etap: '', status: '', tydzen: '' };
+
+// ── Drawer ────────────────────────────────────────────────────────────────────
+function initMobileDrawer(){
+  const hamburger = document.getElementById('mb-hamburger');
+  const drawer    = document.getElementById('mb-drawer');
+  if(!hamburger||!drawer) return;
+
+  hamburger.addEventListener('click', e=>{ e.stopPropagation(); drawer.classList.toggle('open'); });
+  document.getElementById('mb-close-drawer').addEventListener('click', ()=>drawer.classList.remove('open'));
+  document.addEventListener('click', e=>{ if(!drawer.contains(e.target)&&e.target!==hamburger) drawer.classList.remove('open'); });
+
+  // Populate stage buttons
+  const stageBtns = document.getElementById('mb-stage-btns');
+  const allStageBtn = makeDrawerBtn('All stages', ()=>{ mbFilter.etap=''; updateDrawerBtns(stageBtns,''); renderMobile(); });
+  allStageBtn.classList.add('active-btn');
+  stageBtns.appendChild(allStageBtn);
+  getStages().forEach(s=>{
+    const b = makeDrawerBtn('E'+s.etap, ()=>{ mbFilter.etap=String(s.etap); updateDrawerBtns(stageBtns,String(s.etap)); renderMobile(); });
+    b.title = s.opis;
+    b.style.background = STAGE_COLORS[s.etap]||'#888';
+    b.style.color = '#fff'; b.style.borderColor = 'transparent';
+    stageBtns.appendChild(b);
+  });
+
+  // Status buttons already in drawer HTML — wire them
+  const statusBtns = document.getElementById('mb-status-btns');
+  [['All',''],['To do','Do zrobienia'],['In progress','W toku'],['Blocked','Zablokowane'],['Done','Zrobione'],['Drafting','W formułowaniu']].forEach(([label,val])=>{
+    const b = makeDrawerBtn(label, ()=>{ mbFilter.status=val; updateDrawerBtns(statusBtns,val); renderMobile(); });
+    if(!val) b.classList.add('active-btn');
+    statusBtns.appendChild(b);
+  });
+
+  // Action buttons
+  document.getElementById('mb-reload-btn').addEventListener('click',()=>{ drawer.classList.remove('open'); loadFromSheets(); });
+  document.getElementById('mb-clear-storage-btn').addEventListener('click',()=>{
+    try{localStorage.removeItem(LS_FILTERS);localStorage.removeItem(LS_HOURS);}catch(e){}
+    dayHours={}; Object.keys(filters).forEach(k=>filters[k].clear());
+    rebuildFilterOptions(); render(); renderMobile();
+    showToast('Storage cleared','ok'); drawer.classList.remove('open');
+  });
+  document.getElementById('mb-setup-btn').addEventListener('click',()=>{ drawer.classList.remove('open'); showCorsHelp(); });
+}
+function makeDrawerBtn(label, onClick){
+  const b = document.createElement('button');
+  b.className='mb-drawer-btn'; b.textContent=label;
+  b.addEventListener('click', onClick); return b;
+}
+function updateDrawerBtns(container, activeVal){
+  container.querySelectorAll('.mb-drawer-btn').forEach(b=>{
+    const isAll = activeVal==='' && (b.textContent==='All stages'||b.textContent==='All');
+    const isMatch = b.textContent!=='All stages'&&b.textContent!=='All'&&b._val===activeVal;
+    b.classList.toggle('active-btn', isAll||isMatch);
+  });
+  // Store val on button for lookup
+  container.querySelectorAll('.mb-drawer-btn').forEach(b=>{ if(!b._val) b._val=b.dataset&&b.dataset.val||''; });
+}
+
+// ── Chip filter bar ───────────────────────────────────────────────────────────
+function initChips(){
+  document.querySelectorAll('#mb-chips .mb-chip').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      const f=chip.dataset.filter, v=chip.dataset.val;
+      mbFilter[f]=mbFilter[f]===v?'':v;  // toggle
+      // Update chip active states within this filter group
+      document.querySelectorAll(`#mb-chips .mb-chip[data-filter="${f}"]`).forEach(c=>{
+        c.classList.toggle('on', c.dataset.val===mbFilter[f]||(mbFilter[f]===''&&c.dataset.val===''));
+      });
+      renderMobile();
+    });
+  });
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
 function renderMobile(){
   if(!isMobile()) return;
-
-  const etapSel = document.getElementById('mb-filter-etap');
-  if(etapSel.options.length <= 1){
-    getStages().forEach(s=>{
-      const o=document.createElement('option');
-      o.value=String(s.etap);
-      o.textContent='E'+s.etap+': '+s.opis.slice(0,26);
-      etapSel.appendChild(o);
-    });
-  }
-
-  const mbEtap   = etapSel.value;
-  const mbStatus = document.getElementById('mb-filter-status').value;
-  const mbTydzen = document.getElementById('mb-filter-tydzen').value;
-
   const schedTasks=[];
   rawData.forEach(r=>{
     if(r.typ==='ETAP'||!r.czas||r.czas<=0||r.item==null) return;
-    if(mbEtap   && String(r.etap)!==mbEtap) return;
-    if(mbStatus && r.status!==mbStatus) return;
-    if(mbTydzen && r.tenTydzen!==mbTydzen) return;
+    if(mbFilter.etap   && String(r.etap)!==mbFilter.etap) return;
+    if(mbFilter.status && r.status!==mbFilter.status) return;
+    if(mbFilter.tydzen && r.tenTydzen!==mbFilter.tydzen) return;
     schedTasks.push(r);
   });
   schedTasks.sort((a,b)=>Number(a.item)-Number(b.item));
   const scheduled=schedule(schedTasks);
 
   const totalH=scheduled.reduce((s,t)=>s+(t.czas||0),0);
-  const lastDate=scheduled.length?scheduled[scheduled.length-1].endDate:null;
+  const lastDate=scheduled.filter(t=>!t.pinned).reduce((d,t)=>(!d||t.endDate>d?t.endDate:d),null);
   document.getElementById('mobile-infobar').innerHTML=
     `<span>${scheduled.length} tasks · ${totalH.toFixed(1)}h</span>`+
     (lastDate?`<span>Done by: <strong>${fmtLong(lastDate)}</strong></span>`:'');
 
   const stageMap={};
   scheduled.forEach(t=>{ if(!stageMap[t.etap])stageMap[t.etap]=[]; stageMap[t.etap].push(t); });
-  const stageOrder=getStages()
-    .filter(s=>(!mbEtap||String(s.etap)===mbEtap)&&stageMap[s.etap]);
+  const stageOrder=getStages().filter(s=>(!mbFilter.etap||String(s.etap)===mbFilter.etap)&&stageMap[s.etap]);
 
-  const statusCls={
-    'Zrobione':'ms-done','W toku':'ms-wip','Zablokowane':'ms-blocked',
-    'Do zrobienia':'ms-todo','W formułowaniu':'ms-form'
-  };
-
+  const statusCls={'Zrobione':'ms-done','W toku':'ms-wip','Zablokowane':'ms-blocked','Do zrobienia':'ms-todo','W formułowaniu':'ms-form'};
   let html='';
   stageOrder.forEach(stage=>{
     const sc=STAGE_COLORS[stage.etap]||'#888';
@@ -1490,13 +1505,13 @@ function renderMobile(){
       <span class="mb-stage-h">${stageH.toFixed(1)}h</span>
     </div>`;
     tasks.forEach(task=>{
+      const sc2=STAGE_COLORS[task.etap]||'#888';
       const isUrgent=task.priorytet==='Pilne';
       const scls=statusCls[task.status]||'ms-todo';
       const startStr=task.startDate?fmtDD(task.startDate):'—';
       const endStr=task.endDate?fmtDD(task.endDate):'—';
-      const dateStr=task.startDate
-        ?(fmtISO(task.startDate)===fmtISO(task.endDate)?startStr:startStr+' – '+endStr):'—';
-      const barColor=task.status==='Zablokowane'?'#b01a1a':sc;
+      const dateStr=task.startDate?(fmtISO(task.startDate)===fmtISO(task.endDate)?startStr:startStr+' – '+endStr):'—';
+      const barColor=task.status==='Zablokowane'?'#b01a1a':sc2;
       html+=`<div class="mb-task">
         <div class="mb-task-bar" style="background:${barColor}"></div>
         <div class="mb-task-body">
@@ -1520,16 +1535,6 @@ function renderMobile(){
   document.getElementById('mobile-list').innerHTML=html;
 }
 
-// Guard: only wire mobile listeners if elements exist
-if(document.getElementById('mb-filter-etap')){
-  ['mb-filter-etap','mb-filter-status','mb-filter-tydzen'].forEach(id=>{
-    document.getElementById(id).addEventListener('change',renderMobile);
-  });
-  document.getElementById('mb-clear').addEventListener('click',()=>{
-    ['mb-filter-etap','mb-filter-status','mb-filter-tydzen'].forEach(id=>{ document.getElementById(id).value=''; });
-    renderMobile();
-  });
-}
 window.addEventListener('resize',()=>{ if(isMobile()) renderMobile(); });
 
 document.getElementById('prevWeek').addEventListener('click',()=>{viewWeekOffset--;render();});
@@ -1559,9 +1564,14 @@ document.getElementById('clearStorageBtn').addEventListener('click',()=>{
 loadState();
 rebuildFilterOptions();
 render();
-renderMobile();
+if(isMobile()){
+  initMobileDrawer();
+  initChips();
+  renderMobile();
+} else {
+  initSplitter();
+}
 initDrag();
-initSplitter();
 syncScroll();
 if(SHEETS_CSV_URL && !SHEETS_CSV_URL.includes('YOUR_')){
   loadFromSheets();
