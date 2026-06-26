@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Camper HQ — Gantt</title>
+<style>
+:root {
+  --bg: #f9f8f6; --surface: #ffffff;
+  --border: rgba(0,0,0,0.09); --border-strong: rgba(0,0,0,0.17);
+  --text: #1a1a18; --text-sec: #6b6b67; --text-hint: #9a9a96;
+  --radius: 6px; --today: #D85A30;
+  --col: 56px; --label: 280px; --meta: 100px; --row: 32px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#18181a; --surface:#232325; --border:rgba(255,255,255,0.09); --border-strong:rgba(255,255,255,0.17); --text:#f0efe8; --text-sec:#9a9a96; --text-hint:#5f5e5a; }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── TOPBAR ── */
+.topbar{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:0.5px solid var(--border);background:var(--surface);flex-shrink:0;flex-wrap:wrap}
+.topbar-title{font-weight:600;font-size:14px;white-space:nowrap}
+.topbar-title span{font-weight:400;color:var(--text-sec);font-size:12px;margin-left:6px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.sheets-link{font-size:11px;color:#185FA5;text-decoration:none;display:flex;align-items:center;gap:4px;border:0.5px solid #B5D4F4;padding:4px 9px;border-radius:var(--radius);background:#E6F1FB}
+.sheets-link:hover{background:#B5D4F4}
+.btn{padding:4px 10px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:transparent;color:var(--text);cursor:pointer;font-size:12px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.btn:hover{background:var(--bg)}
+
+/* ── FILTERS ── */
+.filterbar{padding:7px 14px;border-bottom:0.5px solid var(--border);background:var(--surface);flex-shrink:0;display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.filter-group{display:flex;flex-direction:column;gap:3px}
+.filter-label{font-size:10px;font-weight:600;letter-spacing:.04em;color:var(--text-hint);text-transform:uppercase}
+.multiselect{position:relative}
+.ms-trigger{border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:4px 8px;font-size:12px;background:var(--bg);color:var(--text);cursor:pointer;min-width:108px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;user-select:none;display:flex;align-items:center;justify-content:space-between;gap:4px}
+.ms-trigger:hover{background:var(--surface)}
+.ms-trigger .arrow{font-size:9px;opacity:.45;flex-shrink:0}
+.ms-dropdown{position:absolute;top:calc(100% + 3px);left:0;z-index:300;background:var(--surface);border:0.5px solid var(--border-strong);border-radius:var(--radius);box-shadow:0 4px 20px rgba(0,0,0,.15);min-width:190px;max-height:260px;overflow-y:auto;display:none}
+.ms-dropdown.open{display:block}
+.ms-opt{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;font-size:12px}
+.ms-opt:hover{background:var(--bg)}
+.ms-opt input{width:13px;height:13px;cursor:pointer;accent-color:#3266ad;flex-shrink:0}
+.ms-opt label{cursor:pointer;flex:1}
+.ms-all{font-size:11px;padding:6px 10px;border-bottom:0.5px solid var(--border);color:var(--text-sec);cursor:pointer}
+.ms-all:hover{background:var(--bg)}
+
+/* ── TIMEBAR ── */
+.timebar{padding:6px 14px;background:var(--surface);border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
+.timebar-label{font-size:11px;color:var(--text-sec);white-space:nowrap}
+.day-inputs{display:flex;gap:5px}
+.day-slot{display:flex;flex-direction:column;align-items:center;gap:2px}
+.day-slot label{font-size:9px;color:var(--text-hint);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+.day-slot input[type=number]{width:42px;text-align:center;padding:3px 4px;border:0.5px solid var(--border-strong);border-radius:4px;background:var(--bg);color:var(--text);font-size:12px}
+.timebar-nav{display:flex;align-items:center;gap:4px;margin-left:auto}
+.nav-btn{padding:4px 9px;border:0.5px solid var(--border-strong);border-radius:var(--radius);background:transparent;color:var(--text-sec);cursor:pointer;font-size:15px;line-height:1}
+.nav-btn:hover{background:var(--bg);color:var(--text)}
+.week-range{font-size:12px;color:var(--text-sec);min-width:130px;text-align:center}
+
+/* ── INFOBAR ── */
+.infobar{padding:5px 14px;background:var(--bg);border-bottom:0.5px solid var(--border);font-size:11px;color:var(--text-sec);display:flex;gap:16px;flex-wrap:wrap;flex-shrink:0;align-items:center}
+
+/* ── LEGEND ── */
+.legend{padding:5px 14px;border-bottom:0.5px solid var(--border);background:var(--surface);display:flex;gap:12px;flex-wrap:wrap;align-items:center;flex-shrink:0}
+.leg{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-sec)}
+.badge{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;font-weight:600;white-space:nowrap}
+.b-DECYZJA{background:#FAEEDA;color:#854F0B}
+.b-ZAKUP{background:#E6F1FB;color:#185FA5}
+.b-ZADANIE{background:#EAF3DE;color:#3B6D11}
+.sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block}
+.sd-done{background:#639922}.sd-wip{background:#BA7517}.sd-blocked{background:#A32D2D}.sd-todo{background:#B4B2A9}.sd-form{background:#7F77DD}
+.tw-star{width:7px;height:7px;border-radius:50%;background:#D4537E;display:inline-block;flex-shrink:0}
+
+/* ── GANTT BODY ── */
+.gantt-outer{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+
+/* Split: fixed labels left, scrollable timeline right */
+.gantt-split{display:flex;flex:1;overflow:hidden;min-height:0}
+
+/* Left frozen panel */
+.gantt-labels{flex-shrink:0;width:calc(var(--label) + var(--meta));overflow:hidden;display:flex;flex-direction:column;border-right:1.5px solid var(--border-strong)}
+.labels-head{flex-shrink:0;display:flex;height:52px;align-items:flex-end;background:var(--surface);border-bottom:0.5px solid var(--border);padding:0 8px 6px}
+.labels-head span{font-size:10px;font-weight:600;color:var(--text-hint);text-transform:uppercase;letter-spacing:.04em}
+.labels-scroll{flex:1;overflow:hidden}  /* no scrollbar — synced with right */
+.label-row{height:var(--row);display:flex;align-items:center;border-bottom:0.5px solid var(--border);padding:0 8px}
+.label-row.stage-lr{background:var(--bg);height:calc(var(--row) + 6px)}
+.label-row.stage-lr .stage-pill{font-weight:600;font-size:12px}
+.stage-pill{display:inline-flex;align-items:center;gap:5px}
+.stage-num{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;color:#fff;flex-shrink:0}
+.stage-name{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.task-label{display:flex;align-items:center;gap:5px;min-width:0;width:var(--label);padding-left:14px;flex-shrink:0}
+.task-label .task-icons{display:flex;gap:3px;flex-shrink:0}
+.task-label .task-text{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.task-label .task-text.urgent{color:#993C1D;font-weight:500}
+.task-meta{width:var(--meta);display:flex;align-items:center;gap:5px;flex-shrink:0;padding-left:4px}
+.meta-h{font-size:10px;color:var(--text-hint);white-space:nowrap}
+
+/* Right scrollable timeline */
+.gantt-timeline{flex:1;overflow:auto;display:flex;flex-direction:column;min-width:0}
+
+/* Day-column header row */
+.timeline-head{flex-shrink:0;display:flex;height:52px;background:var(--surface);border-bottom:0.5px solid var(--border);position:sticky;top:0;z-index:10}
+.day-col-head{width:var(--col);min-width:var(--col);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:5px;border-left:0.5px solid var(--border);font-size:10px;color:var(--text-sec);flex-shrink:0;cursor:default}
+.day-col-head.week-start-h{border-left:1.5px solid var(--border-strong)}
+.day-col-head.today-h{border-left:2px solid var(--today)}
+.day-col-head .dc-dow{font-weight:600;font-size:10px}
+.day-col-head .dc-date{font-size:9px;color:var(--text-hint)}
+.day-col-head .dc-cap{font-size:9px;color:var(--text-sec);background:var(--border-strong);border-radius:3px;padding:1px 4px;margin-top:1px;font-weight:600}
+.day-col-head.today-h .dc-dow,.day-col-head.today-h .dc-date{color:var(--today)}
+.day-col-head.weekend-h{background:var(--bg)}
+.t-row .weekend-cell{background:rgba(0,0,0,0.025)}
+@media (prefers-color-scheme: dark){.t-row .weekend-cell{background:rgba(255,255,255,0.025)}}
+
+/* Timeline rows canvas */
+.timeline-rows{position:relative;flex:1}
+.t-row{height:var(--row);position:relative;border-bottom:0.5px solid var(--border);display:flex}
+.t-row.stage-tr{height:calc(var(--row) + 6px);background:var(--bg)}
+
+/* Day grid lines drawn as background columns */
+.t-day-cell{width:var(--col);min-width:var(--col);height:100%;flex-shrink:0;border-left:0.5px solid var(--border);position:relative}
+.t-day-cell.week-start-tc{border-left:1.5px solid var(--border-strong)}
+.t-day-cell.today-tc{border-left:2px solid var(--today)}
+.t-day-cell.today-tc::after{content:'';position:absolute;top:0;bottom:0;left:0;width:100%;background:rgba(216,90,48,.04);pointer-events:none}
+
+/* ── THE GANTT BAR ── absolute, positioned in px from left edge of timeline ── */
+.g-bar{position:absolute;top:50%;transform:translateY(-50%);height:16px;border-radius:4px;cursor:pointer;transition:filter .12s;z-index:5;min-width:4px}
+.g-bar:hover{filter:brightness(1.12)}
+.g-bar.is-done{background-image:repeating-linear-gradient(
+    45deg,
+    transparent 0px,transparent 4px,
+    rgba(255,255,255,.9) 4px,rgba(255,255,255,.9) 6px
+  )}
+.g-bar.is-blocked{background-color:#b01a1a !important;background-image:repeating-linear-gradient(
+    45deg,
+    transparent 0px,transparent 4px,
+    rgba(255,255,255,.85) 4px,rgba(255,255,255,.85) 6px
+  )}
+/* Stage span bar — thin strip */
+.g-stage-span{position:absolute;bottom:4px;height:4px;border-radius:2px;opacity:.35;z-index:2;pointer-events:none}
+/* Today line overlay */
+.today-overlay{position:absolute;top:0;bottom:0;width:2px;background:var(--today);opacity:.7;z-index:20;pointer-events:none}
+
+/* Tooltip */
+#tooltip{position:fixed;pointer-events:none;z-index:999;display:none;background:var(--surface);border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:9px 13px;box-shadow:0 4px 20px rgba(0,0,0,.18);max-width:270px;font-size:12px}
+#tooltip .tt-title{font-weight:600;margin-bottom:5px;color:var(--text);line-height:1.3}
+#tooltip .tt-row{color:var(--text-sec);margin-top:3px}
+.empty-msg{padding:40px 16px;text-align:center;color:var(--text-sec);font-size:13px;width:100%}
+
+/* ── DRAG & DROP ── */
+.label-row[draggable=true]{cursor:grab}
+.label-row[draggable=true]:active{cursor:grabbing}
+.label-row.drag-source{opacity:.35}
+.label-row.drop-target{background:rgba(50,102,173,.12) !important;border-top:2px solid #3266ad !important}
+#drag-ghost{position:fixed;pointer-events:none;z-index:9999;background:var(--surface);border:1.5px solid #3266ad;border-radius:var(--radius);padding:5px 10px;font-size:11px;font-weight:500;color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,.18);white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;display:none}
+#writebar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9990;display:none;gap:10px;align-items:center;background:var(--surface);border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:8px 14px;font-size:12px;box-shadow:0 4px 20px rgba(0,0,0,.18)}
+#writebar.show{display:flex}
+#writebar .wb-msg{color:var(--text)}
+#writebar button{font-size:11px;padding:3px 8px;border:0.5px solid var(--border-strong);border-radius:4px;background:transparent;cursor:pointer;color:var(--text)}
+#writebar button:hover{background:var(--bg)}
+#writebar .wb-confirm{background:#3266ad;color:#fff;border-color:#3266ad}
+#writebar .wb-confirm:hover{background:#185FA5}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title">🚐 Camper HQ <span>Renault Trafic 2013</span></div>
+  <div class="topbar-right">
+    <a class="sheets-link" id="sheetsLink" href="#" target="_blank">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Open in Sheets
+    </a>
+    <button class="btn" id="reloadBtn">↻ Reload</button>
+    <button class="btn" id="clearStorageBtn" title="Clear saved filters and hour overrides, then reload fresh">⚠ Reset storage</button>
+    <button class="btn" id="setupBtn">⚙ Setup</button>
+  </div>
+</div>
+
+<div class="filterbar" id="filterbar"></div>
+
+<div class="legend">
+  <span class="leg"><span style="display:inline-block;width:14px;height:3px;background:var(--today);border-radius:1px"></span> Today</span>
+</div>
+
+<div class="timebar">
+  <span class="timebar-label">Hours/day:</span>
+  <div class="day-inputs" id="dayInputs"></div>
+  <button class="btn" id="resetHours">Reset to 4h</button>
+  <div class="timebar-nav">
+    <button class="nav-btn" id="prevWeek">‹</button>
+    <span class="week-range" id="weekRange"></span>
+    <button class="nav-btn" id="nextWeek">›</button>
+    <button class="btn" id="todayBtn">Today</button>
+  </div>
+</div>
+
+<div class="infobar" id="infobar"></div>
+
+<div class="gantt-outer">
+  <div class="gantt-split">
+    <!-- Frozen label column -->
+    <div class="gantt-labels">
+      <div class="labels-head">
+        <span style="width:var(--label)">Task</span>
+        <span style="width:var(--meta)">Type / h</span>
+      </div>
+      <div class="labels-scroll" id="labelsScroll">
+        <div id="labelRows"></div>
+      </div>
+    </div>
+    <!-- Scrollable timeline -->
+    <div class="gantt-timeline" id="ganttTimeline">
+      <div class="timeline-head" id="timelineHead"></div>
+      <div class="timeline-rows" id="timelineRows"></div>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+<div id="drag-ghost"></div>
+<div id="writebar">
+  <span class="wb-msg" id="wbMsg"></span>
+  <button class="wb-confirm" id="wbConfirm">Write to Sheets</button>
+  <button id="wbCancel">Cancel</button>
+</div>
+
+<script>
+// ── CONFIG — fill in both values below ──────────────────────────────────────
+// 1. Your Apps Script deployment URL (from Deploy → Manage deployments → copy URL)
+const SHEETS_CSV_URL = 'https://script.google.com/macros/s/AKfycbz-l3s52ma0k0hcXdPG4gA7-orObOD1UopbXhfzbNXyM1yu9MmmKHOf8h4SdoFKDd4/exec';
+// e.g. 'https://script.google.com/macros/s/AKfy.../exec'
+
+// 2. Your Google Sheets edit URL (the browser URL when you have the sheet open)
+const SHEETS_EDIT_URL = 'https://docs.google.com/spreadsheets/d/1P5XhFKVQC3Y4xmgXZDRhx0g2JV13AXe3HxLzKMVAOd0/edit?usp=sharing';
+// e.g. 'https://docs.google.com/spreadsheets/d/1ABC.../edit'
+// e.g. 'https://docs.google.com/spreadsheets/d/1ABC.../edit'
+
+const COL_W = 56;   // px per day column — must match CSS --col
+const ROW_H = 32;   // px per task row — must match CSS --row
+const STAGE_ROW_H = 38;
+const DEFAULT_HOURS = 4;
+
+// ── STATIC DATA ──────────────────────────────────────────────────────────────
+// Static data uses globally sequential Item # (1-based, no per-stage restart)
+// This is a snapshot — live data from Sheets overrides this on load.
+const STATIC_DATA = [
+  {etap:0,item:null,typ:'ETAP',opis:'Warsztat — wyposażenie podstawowe',czas:null,status:'W toku',priorytet:'Wysoki',tenTydzen:'TAK'},
+  {etap:0,item:1,typ:'ZAKUP',opis:'Multimetr: Uni-T UT61E vs Brymen — który?',czas:0.5,status:'Do zrobienia',priorytet:'Normalny',tenTydzen:'NIE'},
+  {etap:0,item:2,typ:'ZAKUP',opis:'Zaciskarka do końcówek kablowych',czas:0.5,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:0,item:3,typ:'ZAKUP',opis:'Obieraczka do kabli (stripper automatyczny)',czas:0.5,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:0,item:4,typ:'ZAKUP',opis:'Tester napięcia bezkontaktowy',czas:0.5,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:0,item:5,typ:'ZAKUP',opis:'Wiertło stopniowe do blach 4–20mm',czas:0.5,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:0,item:6,typ:'ZADANIE',opis:'Dokończyć stół MFT',czas:3.0,status:'W toku',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:1,item:null,typ:'ETAP',opis:'Daszek (wentylator dachowy)',czas:null,status:'Zablokowane',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:1,item:7,typ:'DECYZJA',opis:'Uszczelki i kołnierz — jaki typ, materiał, ile?',czas:1.5,status:'Zrobione',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:1,item:8,typ:'DECYZJA',opis:'Koncepcja całej konstrukcji z wentylatorem',czas:1.0,status:'Do zrobienia',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:1,item:9,typ:'ZAKUP',opis:'Otwornica 20cm',czas:0.2,status:'Do zrobienia',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:1,item:10,typ:'ZAKUP',opis:'Kołnierz montażowy',czas:0.2,status:'Zablokowane',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:1,item:11,typ:'ZAKUP',opis:'Uszczelki',czas:0.2,status:'Zablokowane',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:2,item:null,typ:'ETAP',opis:'Przygotowanie przestrzeni — podłoga i ściany',czas:null,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:2,item:12,typ:'ZADANIE',opis:'Opróżnienie i odkurzenie podłogi i ścian',czas:0.2,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:2,item:13,typ:'ZADANIE',opis:'Usunięcie haków',czas:1.0,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:2,item:14,typ:'ZADANIE',opis:'Usunięcie kleju i silikonu z podłogi i ścian',czas:7.0,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:2,item:15,typ:'DECYZJA',opis:'Czym myć kleje i odtłuszczać? Jakie środki?',czas:0.5,status:'Do zrobienia',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:2,item:16,typ:'ZAKUP',opis:'Środki myjące + odtłuszczające + narzędzia',czas:0.5,status:'Zablokowane',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:2,item:17,typ:'ZADANIE',opis:'Mycie podłogi i ścian',czas:4.0,status:'Zablokowane',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:2,item:18,typ:'ZADANIE',opis:'Obróbka rdzy — konwerter lub szlifowanie',czas:4.0,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:2,item:19,typ:'DECYZJA',opis:'Czym zakleić dziury w podłodze? Jaka technologia?',czas:1.0,status:'Do zrobienia',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:2,item:20,typ:'ZAKUP',opis:'Nity + nitownica',czas:1.0,status:'Zablokowane',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:3,item:null,typ:'ETAP',opis:'Sound deadening',czas:null,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:3,item:21,typ:'DECYZJA',opis:'Jakie powierzchnie pokryć deadenerami?',czas:0.5,status:'Do zrobienia',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:4,item:null,typ:'ETAP',opis:'Izolacja podłogi i wykończenie podłogi',czas:null,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:4,item:22,typ:'DECYZJA',opis:'XPS vs PIR — termoizolacja vs przestrzeń/wysokość',czas:5.0,status:'Do zrobienia',priorytet:'Pilne',tenTydzen:'TAK'},
+  {etap:5,item:null,typ:'ETAP',opis:'Izolacja ścian i sufitu',czas:null,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:6,item:null,typ:'ETAP',opis:'Instalacja elektryczna',czas:null,status:'Do zrobienia',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:6,item:6,typ:'DECYZJA',opis:'⚠️ MEGADECYZJA: Drzwi serwisowe vs meble vs elektryka',czas:5.0,status:'Do zrobienia',priorytet:'Pilne',tenTydzen:'NIE'},
+  {etap:7,item:null,typ:'ETAP',opis:'Meble',czas:null,status:'W formułowaniu',priorytet:'Wysoki',tenTydzen:'NIE'},
+  {etap:7,item:8,typ:'DECYZJA',opis:'⚠️ MEGADECYZJA INTEGRACYJNA: Layout całości',czas:5.0,status:'Do zrobienia',priorytet:'Pilne',tenTydzen:'NIE'},
+  {etap:8,item:null,typ:'ETAP',opis:'Wykończenie',czas:null,status:'W formułowaniu',priorytet:'Normalny',tenTydzen:'NIE'},
+];
+
+const STAGE_COLORS = {0:'#5F5E5A',1:'#185FA5',2:'#0F6E56',3:'#534AB7',4:'#993C1D',5:'#085041',6:'#993556',7:'#854F0B',8:'#3B6D11'};
+const STAGE_BG     = {0:'#B4B2A9',1:'#85B7EB',2:'#5DCAA5',3:'#AFA9EC',4:'#F0997B',5:'#9FE1CB',6:'#ED93B1',7:'#FAC775',8:'#97C459'};
+const DOW_PL = ['Nd','Pn','Wt','Śr','Cz','Pt','Sb'];
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let rawData = STATIC_DATA;
+let filters = {etap:new Set(),typ:new Set(),priorytet:new Set(),tenTydzen:new Set(),status:new Set()};
+let dayHours = {};
+let viewWeekOffset = 0;
+
+// ── DATE UTILS ────────────────────────────────────────────────────────────────
+function getMonday(d){const r=new Date(d);r.setHours(0,0,0,0);const day=r.getDay();r.setDate(r.getDate()-(day===0?6:day-1));return r}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r}
+function fmtISO(d){return d.toISOString().split('T')[0]}
+function fmtDD(d){return d.toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'})}
+function fmtLong(d){return d.toLocaleDateString('pl-PL',{day:'numeric',month:'short',year:'numeric'})}
+function isWeekend(d){const w=d.getDay();return w===0||w===6}
+function skipWork(d){let r=new Date(d);while(isWeekend(r))r=addDays(r,1);return r}
+function getDayAvail(k){
+  // Every day defaults to DEFAULT_HOURS — weekends are normal working days
+  if(dayHours[k]!==undefined) return dayHours[k];
+  return DEFAULT_HOURS;
+}
+
+// All calendar days between two dates inclusive (weekends shown, greyed out)
+function allDaysBetween(from, to){
+  const days=[];
+  let d=new Date(from);
+  while(d<=to){days.push(new Date(d));d=addDays(d,1);}
+  return days;
+}
+// Still used for scheduling — weekends have 0 capacity by default
+function workDaysBetween(from, to){
+  const days=[];
+  let d=new Date(from);
+  while(d<=to){if(!isWeekend(d))days.push(new Date(d));d=addDays(d,1);}
+  return days;
+}
+
+// ── DATA STAGES ───────────────────────────────────────────────────────────────
+function getStages(){
+  const stages=[];let cur=null;
+  for(const row of rawData){
+    if(row.typ==='ETAP'){cur={...row,steps:[]};stages.push(cur);}
+    else if(cur) cur.steps.push(row);
+  }
+  return stages;
+}
+function applyFilters(stages){
+  return stages.map(s=>{
+    if(filters.etap.size&&!filters.etap.has(String(s.etap)))return null;
+    let steps=s.steps.filter(t=>t.czas&&t.czas>0);
+    if(filters.typ.size) steps=steps.filter(t=>filters.typ.has(t.typ));
+    if(filters.priorytet.size) steps=steps.filter(t=>filters.priorytet.has(t.priorytet));
+    if(filters.tenTydzen.size) steps=steps.filter(t=>filters.tenTydzen.has(t.tenTydzen));
+    if(filters.status.size) steps=steps.filter(t=>filters.status.has(t.status));
+    const hasActiveFilter=filters.typ.size||filters.priorytet.size||filters.tenTydzen.size||filters.status.size;
+    if(steps.length===0&&hasActiveFilter)return null;
+    // Sort by Item # ascending (nulls last)
+    steps=steps.slice().sort((a,b)=>{
+      if(a.item==null&&b.item==null)return 0;
+      if(a.item==null)return 1;
+      if(b.item==null)return -1;
+      return a.item-b.item;
+    });
+    return{...s,steps};
+  }).filter(Boolean);
+}
+
+// ── SCHEDULER ─────────────────────────────────────────────────────────────────
+// Returns tasks with .startDate, .endDate
+// Tasks are distributed across ALL days (incl weekends) at getDayAvail(day) hours/day
+function schedule(tasks){
+  const today=new Date();today.setHours(0,0,0,0);
+  const deadline=addDays(today,730); // safety: never schedule beyond 2 years
+  let cursor=new Date(today);
+  const used={};
+  const avail=d=>{const k=fmtISO(d);const cap=getDayAvail(k);return cap-(used[k]||0);};
+  const consume=(d,h)=>{const k=fmtISO(d);used[k]=(used[k]||0)+h;};
+  const results=[];
+  for(const task of tasks){
+    let rem=task.czas;
+    const segs=[];
+    let guard=0;
+    while(rem>0.001&&cursor<deadline){
+      guard++;if(guard>10000)break; // infinite loop guard
+      const a=avail(cursor);
+      if(a<=0.001){cursor=addDays(cursor,1);continue;}
+      const h=Math.min(rem,a);
+      segs.push({date:new Date(cursor),hours:h,cap:getDayAvail(fmtISO(cursor))});
+      consume(cursor,h);
+      rem-=h;
+      if(avail(cursor)<=0.001)cursor=addDays(cursor,1);
+    }
+    if(segs.length){
+      results.push({...task,segs,startDate:segs[0].date,endDate:segs[segs.length-1].date});
+    }
+  }
+  return results;
+}
+
+// ── DAY INPUTS ────────────────────────────────────────────────────────────────
+function buildDayInputs(viewMonday){
+  const container=document.getElementById('dayInputs');
+  container.innerHTML='';
+  for(let i=0;i<7;i++){
+    const d=addDays(viewMonday,i);
+    const key=fmtISO(d);
+    const val=getDayAvail(key);
+    const slot=document.createElement('div');
+    slot.className='day-slot';
+    // Weekends shown at full opacity — available for allocation
+    slot.innerHTML=`<label>${DOW_PL[d.getDay()]}<br>${fmtDD(d)}</label><input type="number" min="0" max="16" step="0.5" value="${val}" data-key="${key}">`;
+    slot.querySelector('input').addEventListener('change',e=>{
+      const v=parseFloat(e.target.value);
+      if(!isNaN(v)&&v>=0){dayHours[key]=v;saveState();render();}
+    });
+    container.appendChild(slot);
+  }
+}
+
+// ── MULTISELECT ───────────────────────────────────────────────────────────────
+function buildMultiSelect(label,options,stateKey){
+  const group=document.createElement('div');
+  group.className='filter-group';
+  group.innerHTML=`<span class="filter-label">${label}</span>`;
+  const ms=document.createElement('div');ms.className='multiselect';
+  const trigger=document.createElement('div');trigger.className='ms-trigger';trigger.tabIndex=0;
+  const lspan=document.createElement('span');lspan.className='ms-label';
+  lspan.textContent=filters[stateKey].size===0?'All':`${filters[stateKey].size} selected`;
+  trigger.appendChild(lspan);
+  const arr=document.createElement('span');arr.className='arrow';arr.textContent='▾';trigger.appendChild(arr);
+  const dd=document.createElement('div');dd.className='ms-dropdown';
+  const allBtn=document.createElement('div');allBtn.className='ms-all';allBtn.textContent='✕ Clear';
+  allBtn.addEventListener('click',e=>{
+    e.stopPropagation();filters[stateKey].clear();
+    dd.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false);
+    lspan.textContent='All';saveState();render();
+  });
+  dd.appendChild(allBtn);
+  options.forEach(opt=>{
+    const div=document.createElement('div');div.className='ms-opt';
+    const cb=document.createElement('input');cb.type='checkbox';cb.value=opt.value;
+    cb.id=`ms-${stateKey}-${opt.value}`;cb.checked=filters[stateKey].has(opt.value);
+    const lbl=document.createElement('label');lbl.htmlFor=cb.id;lbl.textContent=opt.label;
+    div.appendChild(cb);div.appendChild(lbl);
+    cb.addEventListener('change',e=>{
+      e.stopPropagation();
+      if(cb.checked)filters[stateKey].add(opt.value);else filters[stateKey].delete(opt.value);
+      const sel=filters[stateKey];
+      lspan.textContent=sel.size===0?'All':`${sel.size} selected`;
+      saveState();render();
+    });
+    dd.appendChild(div);
+  });
+  trigger.addEventListener('click',e=>{
+    e.stopPropagation();const was=dd.classList.contains('open');
+    document.querySelectorAll('.ms-dropdown.open').forEach(x=>x.classList.remove('open'));
+    if(!was)dd.classList.add('open');
+  });
+  ms.appendChild(trigger);ms.appendChild(dd);group.appendChild(ms);return group;
+}
+document.addEventListener('click',()=>document.querySelectorAll('.ms-dropdown.open').forEach(x=>x.classList.remove('open')));
+
+function rebuildFilterOptions(){
+  const stages=getStages();
+  const etapOpts=stages.map(s=>({value:String(s.etap),label:`E${s.etap}: ${s.opis.slice(0,24)}`}));
+  const typOpts=[{value:'ZADANIE',label:'ZADANIE'},{value:'DECYZJA',label:'DECYZJA'},{value:'ZAKUP',label:'ZAKUP'}];
+  const priOpts=['Pilne','Wysoki','Normalny'].map(v=>({value:v,label:v}));
+  const tydOpts=[{value:'TAK',label:'Yes — this week'},{value:'NIE',label:'No'}];
+  const statOpts=['Do zrobienia','W toku','Zablokowane','Zrobione','W formułowaniu'].map(v=>({value:v,label:v}));
+  const fb=document.getElementById('filterbar');fb.innerHTML='';
+  fb.appendChild(buildMultiSelect('Stage',etapOpts,'etap'));
+  fb.appendChild(buildMultiSelect('Type',typOpts,'typ'));
+  fb.appendChild(buildMultiSelect('Priority',priOpts,'priorytet'));
+  fb.appendChild(buildMultiSelect('This week',tydOpts,'tenTydzen'));
+  fb.appendChild(buildMultiSelect('Status',statOpts,'status'));
+  const cg=document.createElement('div');cg.className='filter-group';
+  cg.innerHTML='<span class="filter-label" style="opacity:0">x</span>';
+  const cb=document.createElement('button');cb.className='btn';cb.textContent='✕ Clear all';
+  cb.addEventListener('click',()=>{Object.keys(filters).forEach(k=>filters[k].clear());rebuildFilterOptions();saveState();render();});
+  cg.appendChild(cb);fb.appendChild(cg);
+}
+
+// ── TOOLTIP ───────────────────────────────────────────────────────────────────
+const tt=document.getElementById('tooltip');
+function showTT(e,task){
+  const dot={Zrobione:'✅',Zablokowane:'🔴','W toku':'🟡','Do zrobienia':'⬜','W formułowaniu':'🟣'};
+  tt.innerHTML=`<div class="tt-title">${task.opis}</div>
+    <div class="tt-row">Etap ${task.etap} · ${task.typ}</div>
+    <div class="tt-row">${task.czas}h · ${dot[task.status]||''} ${task.status}</div>
+    <div class="tt-row">Priority: ${task.priorytet}</div>
+    ${task.startDate?`<div class="tt-row">Start: ${fmtLong(task.startDate)}</div>`:''}
+    ${task.endDate?`<div class="tt-row">End: ${fmtLong(task.endDate)}</div>`:''}`;
+  tt.style.display='block';moveTT(e);
+}
+function moveTT(e){tt.style.left=(e.clientX+14)+'px';tt.style.top=(e.clientY-10)+'px';}
+function hideTT(){tt.style.display='none';}
+
+// ── SYNC SCROLL ───────────────────────────────────────────────────────────────
+// Labels scroll vertically in sync with timeline
+function syncScroll(){
+  const tl=document.getElementById('ganttTimeline');
+  const ls=document.getElementById('labelsScroll');
+  tl.addEventListener('scroll',()=>{ls.scrollTop=tl.scrollTop;});
+}
+
+// ── MAIN RENDER ───────────────────────────────────────────────────────────────
+function render(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const thisMonday=getMonday(today);
+  const viewMonday=addDays(thisMonday,viewWeekOffset*7);
+  const viewSunday=addDays(viewMonday,6);
+
+  buildDayInputs(viewMonday);
+  document.getElementById('weekRange').textContent=`${fmtDD(viewMonday)} – ${fmtDD(viewSunday)}`;
+  if(SHEETS_EDIT_URL&&!SHEETS_EDIT_URL.includes('YOUR_'))document.getElementById('sheetsLink').href=SHEETS_EDIT_URL;
+  else document.getElementById('sheetsLink').style.display='none';
+
+  // Filter & schedule
+  const stages=getStages();
+  const filtered=applyFilters(stages);
+
+  // ── SCHEDULING: flat list from rawData sorted purely by global Item # ──────
+  // This is INDEPENDENT of the stage-grouped display structure.
+  // We apply the same filters but collect across all stages in global Item # order.
+  const allTasksForSchedule=[];
+  rawData.forEach(r=>{
+    if(r.typ==='ETAP'||!r.czas||r.czas<=0||r.item==null) return;
+    // Apply active filters
+    if(filters.etap.size&&!filters.etap.has(String(r.etap))) return;
+    if(filters.typ.size&&!filters.typ.has(r.typ)) return;
+    if(filters.priorytet.size&&!filters.priorytet.has(r.priorytet)) return;
+    if(filters.tenTydzen.size&&!filters.tenTydzen.has(r.tenTydzen)) return;
+    if(filters.status.size&&!filters.status.has(r.status)) return;
+    allTasksForSchedule.push(r);
+  });
+  // Sort by global Item # — coerce to number defensively
+  allTasksForSchedule.sort((a,b)=>Number(a.item)-Number(b.item));
+  const scheduled=schedule(allTasksForSchedule);
+  const schedMap={};
+  scheduled.forEach(t=>{
+    schedMap[`${t.etap}-${t.item}`]=t;  // legacy key (for stage span lookup)
+    schedMap[`opis:${t.opis}`]=t;        // primary key by unique name
+  });
+
+  // Date range for columns: from viewMonday to max(endDate, viewMonday+13) 
+  const lastSched=scheduled.length?scheduled[scheduled.length-1].endDate:null;
+  const colEnd=lastSched?addDays(lastSched,2):addDays(viewMonday,13);
+  // Show at least current+next week
+  const colEndMin=addDays(viewMonday,13);
+  const colEndFinal=colEnd>colEndMin?colEnd:colEndMin;
+
+  // All calendar days (incl weekends) from viewMonday to colEndFinal
+  const colDays=allDaysBetween(viewMonday,colEndFinal);
+  const nCols=colDays.length;
+  const totalWidth=nCols*COL_W;
+
+  // Day-index lookup: ISO date → column index
+  const dayIdx={};
+  colDays.forEach((d,i)=>dayIdx[fmtISO(d)]=i);
+
+  // Helper: date → pixel x (left edge of that day's column)
+  // For a bar spanning start→end we use: left=dayIdx[start]*COL_W, right=(dayIdx[end]+1)*COL_W
+  function dateToX(d){
+    const k=fmtISO(d);
+    if(dayIdx[k]!==undefined)return dayIdx[k]*COL_W;
+    // date may be before view window
+    if(d<colDays[0])return 0;
+    return totalWidth;
+  }
+  function barLeft(startDate){return dateToX(startDate);}
+  function barRight(endDate){
+    const k=fmtISO(endDate);
+    if(dayIdx[k]!==undefined)return(dayIdx[k]+1)*COL_W;
+    if(endDate>colDays[colDays.length-1])return totalWidth;
+    return 0;
+  }
+  function barWidth(startDate,endDate){return Math.max(6,barRight(endDate)-barLeft(startDate));}
+
+  // Today line x
+  const todayX=dayIdx[fmtISO(today)]!==undefined?(dayIdx[fmtISO(today)]*COL_W+COL_W/2):null;
+
+  // Info bar
+  const totalH=scheduled.reduce((s,t)=>s+(t.czas||0),0);
+  const doneCnt=scheduled.filter(t=>t.status==='Zrobione').length;
+  const isLive = rawData !== STATIC_DATA;
+  document.getElementById('infobar').innerHTML=`
+    <span>${scheduled.length} tasks</span>
+    <span>${totalH.toFixed(1)}h total</span>
+    <span>✅ ${doneCnt} done</span>
+    ${lastSched?`<span>Completion: <strong>${fmtLong(lastSched)}</strong></span>`:''}
+    <span style="margin-left:auto;font-size:10px;padding:2px 7px;border-radius:3px;background:${isLive?'#1a3a1a':'#3a2a0a'};color:${isLive?'#97C459':'#FAC775'}">${isLive?'● Live data':'⚠ Static snapshot — click Reload'}</span>
+  `;
+
+  // ── BUILD LABEL ROWS ────────────────────────────────────────────────────────
+  let labelHTML='';
+  if(filtered.length===0){
+    labelHTML=`<div style="padding:30px 14px;color:var(--text-sec);font-size:13px">No tasks match filters.</div>`;
+  }
+  filtered.forEach(stage=>{
+    const sc=STAGE_COLORS[stage.etap]||'#888';
+    const stageH=stage.steps.reduce((s,t)=>s+(t.czas||0),0);
+    labelHTML+=`<div class="label-row stage-lr" style="height:${STAGE_ROW_H}px">
+      <div class="task-label" style="width:calc(var(--label) + var(--meta));padding-left:8px">
+        <div class="stage-pill">
+          <span class="stage-num" style="background:${sc}">${stage.etap}</span>
+          <span class="stage-name">${stage.opis}</span>
+        </div>
+        <span style="margin-left:auto;font-size:10px;color:var(--text-hint);white-space:nowrap;padding-right:8px">${stageH>0?stageH.toFixed(1)+'h':''}</span>
+      </div>
+    </div>`;
+    stage.steps.forEach(step=>{
+      const key=`${step.etap}-${step.item}`;
+      const sched=schedMap[`opis:${step.opis}`]||schedMap[key];
+      const dotCls={'Zrobione':'sd-done','W toku':'sd-wip','Zablokowane':'sd-blocked','Do zrobienia':'sd-todo','W formułowaniu':'sd-form'}[step.status]||'sd-todo';
+      const isUrgent=step.priorytet==='Pilne';
+      const badgeCls=`b-${step.typ}`;
+      labelHTML+=`<div class="label-row" style="height:${ROW_H}px" draggable="true" data-etap="${step.etap}" data-item="${step.item}" data-opis="${step.opis.replace(/`/g,'\\`')}">
+        <div class="task-label" style="width:var(--label)">
+          <div class="task-icons">
+     
+          </div>
+          <span class="task-text${isUrgent?' urgent':''}" title="${step.opis}">${step.opis}</span>
+        </div>
+        <div class="task-meta">
+          <span class="badge ${badgeCls}">${step.typ}</span>
+          <span class="meta-h">${step.czas?step.czas.toFixed(1)+'h':''}</span>
+        </div>
+      </div>`;
+    });
+  });
+  document.getElementById('labelRows').innerHTML=labelHTML;
+
+  // ── BUILD TIMELINE HEAD ─────────────────────────────────────────────────────
+  let headHTML=`<div style="width:${totalWidth}px;display:flex">`;
+  colDays.forEach(d=>{
+    const isToday=fmtISO(d)===fmtISO(today);
+    const isMon=d.getDay()===1;
+    const cap=getDayAvail(fmtISO(d));
+    const isWknd=isWeekend(d);
+    const cls=`day-col-head${isToday?' today-h':''}${isMon?' week-start-h':''}${isWknd?' weekend-h':''}`;
+    headHTML+=`<div class="${cls}" style="width:${COL_W}px;min-width:${COL_W}px">
+      <div class="dc-dow">${DOW_PL[d.getDay()]}</div>
+      <div class="dc-date">${fmtDD(d)}</div>
+      <div class="dc-cap">${cap}h</div>
+    </div>`;
+  });
+  headHTML+='</div>';
+  document.getElementById('timelineHead').innerHTML=headHTML;
+
+  // ── BUILD TIMELINE ROWS ─────────────────────────────────────────────────────
+  let rowsHTML=`<div style="width:${totalWidth}px;position:relative">`;
+  // Today overlay line
+  if(todayX!==null){
+    rowsHTML+=`<div class="today-overlay" style="left:${todayX}px"></div>`;
+  }
+
+  filtered.forEach(stage=>{
+    const sc=STAGE_COLORS[stage.etap]||'#888';
+    const bg=STAGE_BG[stage.etap]||'#ccc';
+
+    // Stage row — show a spanning bar across all scheduled tasks in this stage
+    const stageTasks=stage.steps.map(t=>schedMap[`${t.etap}-${t.item}`]).filter(Boolean);
+    const stageStart=stageTasks.map(t=>t.startDate).sort((a,b)=>a-b)[0];
+    const stageEnd=stageTasks.map(t=>t.endDate).sort((a,b)=>b-a)[0];
+
+    rowsHTML+=`<div class="t-row stage-tr" style="height:${STAGE_ROW_H}px;position:relative">`;
+    // Grid lines
+    colDays.forEach((d,i)=>{
+      const isMon=d.getDay()===1;
+      const isToday2=fmtISO(d)===fmtISO(today);
+      const isWknd2=isWeekend(d);
+      rowsHTML+=`<span style="position:absolute;top:0;bottom:0;left:${i*COL_W}px;width:${COL_W}px;border-left:${isMon?'1.5px solid var(--border-strong)':isToday2?'2px solid var(--today)':'0.5px solid var(--border)'};${isWknd2?'background:rgba(0,0,0,0.03)':''}"></span>`;
+    });
+    if(stageStart&&stageEnd){
+      const left=barLeft(stageStart);const width=barWidth(stageStart,stageEnd);
+      rowsHTML+=`<div class="g-stage-span" style="left:${left}px;width:${width}px;background:${bg}"></div>`;
+    }
+    rowsHTML+='</div>';
+
+    // Task rows
+    stage.steps.forEach(step=>{
+      const key=`${step.etap}-${step.item}`;
+      const sched=schedMap[`opis:${step.opis}`]||schedMap[key];
+      rowsHTML+=`<div class="t-row" style="height:${ROW_H}px;position:relative">`;
+      // Grid lines
+      colDays.forEach((d,i)=>{
+        const isMon=d.getDay()===1;
+        const isToday2=fmtISO(d)===fmtISO(today);
+        const isWknd2=isWeekend(d);
+        rowsHTML+=`<span style="position:absolute;top:0;bottom:0;left:${i*COL_W}px;width:${COL_W}px;border-left:${isMon?'1.5px solid var(--border-strong)':isToday2?'2px solid var(--today)':'0.5px solid var(--border)'};${isWknd2?'background:rgba(0,0,0,0.03)':''}"></span>`;
+      });
+      // THE GANTT BAR — one continuous bar from startDate to endDate
+      if(sched&&sched.startDate&&sched.endDate){
+        const left=barLeft(sched.startDate);
+        const width=barWidth(sched.startDate,sched.endDate);
+        const doneCls=step.status==='Zrobione'?' is-done':step.status==='Zablokowane'?' is-blocked':'';
+        const sc2=STAGE_COLORS[step.etap]||'#888';
+        rowsHTML+=`<div class="g-bar${doneCls}"
+          style="left:${left+2}px;width:${width-4}px;background-color:${sc2}"
+          data-key="${key}"></div>`;
+      }
+      rowsHTML+='</div>';
+    });
+  });
+  rowsHTML+='</div>';
+  document.getElementById('timelineRows').innerHTML=rowsHTML;
+
+  // Tooltip events on bars
+  document.querySelectorAll('.g-bar[data-key]').forEach(el=>{
+    const key=el.dataset.key;
+    const task=schedMap[key];
+    if(!task)return;
+    el.addEventListener('mouseenter',e=>showTT(e,task));
+    el.addEventListener('mousemove',moveTT);
+    el.addEventListener('mouseleave',hideTT);
+  });
+}
+
+// ── CSV LOADER ────────────────────────────────────────────────────────────────
+function parseCSVRow(line){const res=[];let cur='',inQ=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}else if(c===','&&!inQ){res.push(cur);cur='';}else cur+=c;}res.push(cur);return res;}
+function parseCSV(text){
+  // Normalise line endings
+  const lines=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim().split('\n');
+  // Find header row — contains both 'Etap' and 'Typ'
+  let hi=-1;
+  for(let i=0;i<lines.length;i++){
+    if(lines[i].includes('Etap')&&lines[i].includes('Typ')){hi=i;break;}
+  }
+  if(hi<0){console.error('Gantt: header row not found. First 3 lines:',lines.slice(0,3));return null;}
+  const headers=parseCSVRow(lines[hi]).map(h=>h.trim().replace(/^"|"$/g,''));
+  console.log('Gantt CSV headers:',headers);
+  // Exact match first, partial fallback
+  const idx=k=>{
+    const ex=headers.findIndex(h=>h===k);
+    if(ex>=0)return ex;
+    return headers.findIndex(h=>h.toLowerCase().includes(k.toLowerCase()));
+  };
+  // Column indices — log them so we can debug
+  const iE=idx('Etap #'), iI=idx('Item #'), iT=idx('Typ'), iO=idx('Opis'), iC=idx('Czas'), iS=idx('Status'), iP=idx('Priorytet');
+  const iTy=headers.findIndex(h=>h.includes('tydzie')||h.includes('tydzień')||h.toLowerCase().includes('tydz'));
+  console.log('Gantt col indices — Etap:'+iE+' Item:'+iI+' Typ:'+iT+' Opis:'+iO+' Czas:'+iC+' Status:'+iS+' Pri:'+iP+' Tydz:'+iTy);
+  if(iE<0||iI<0||iO<0){console.error('Gantt: critical columns not found in headers:',headers);return null;}
+  const res=[];
+  for(let i=hi+1;i<lines.length;i++){
+    const c=parseCSVRow(lines[i]);
+    if(!c.some(x=>x))continue;
+    const etapRaw=(c[iE]||'').trim();
+    const etap=parseFloat(etapRaw);
+    if(isNaN(etap)&&etapRaw!=='0')continue;
+    const czas=parseFloat((c[iC]||'').trim());
+    const itemVal=parseFloat((c[iI]||'').trim());
+    res.push({
+      etap:isNaN(etap)?0:etap,
+      item:isNaN(itemVal)?null:itemVal,  // stored as NUMBER, not string
+      typ:(c[iT]||'').trim(),
+      opis:(c[iO]||'').trim(),
+      czas:isNaN(czas)?null:czas,
+      status:(c[iS]||'').trim(),
+      priorytet:(c[iP]||'').trim(),
+      tenTydzen:(c[iTy]||'').trim().toUpperCase(),
+    });
+  }
+  console.log('Gantt: parsed',res.length,'rows, sample item#s:',res.filter(r=>r.item!=null).slice(0,5).map(r=>r.item));
+  return res;
+}
+let _toast;
+function showToast(msg,type){
+  if(!_toast){_toast=document.createElement('div');document.body.appendChild(_toast);}
+  const col={info:'#185FA5',ok:'#3B6D11',warn:'#854F0B',error:'#A32D2D'}[type]||'#333';
+  Object.assign(_toast.style,{position:'fixed',bottom:'18px',left:'50%',transform:'translateX(-50%)',zIndex:'9999',background:col,color:'#fff',padding:'8px 16px',borderRadius:'6px',fontSize:'12px',opacity:'1',transition:'opacity .3s'});
+  _toast.textContent=msg;clearTimeout(_toast._t);_toast._t=setTimeout(()=>_toast.style.opacity='0',3000);
+}
+function loadFromSheets(){
+  if(!SHEETS_CSV_URL||SHEETS_CSV_URL.includes('YOUR_')){
+    showToast('Paste your Apps Script URL into SHEETS_CSV_URL in the HTML file.','warn');return;
+  }
+  showToast('Loading from Sheets…','info');
+  // Use JSONP script-tag injection — the ONLY method that works from file:// to external URLs.
+  // Requires doGet in Apps Script to support ?callback=xxx and return wrapped JSON (see below).
+  const cbName = '_ganttLoad_' + Date.now();
+  const script = document.createElement('script');
+  script.src = SHEETS_CSV_URL + (SHEETS_CSV_URL.includes('?')?'&':'?') + 'callback=' + cbName + '&_t=' + Date.now();
+  const timer = setTimeout(()=>{
+    cleanup();
+    showToast('Timeout — check Apps Script URL and deployment','error');
+  }, 15000);
+  window[cbName] = function(data){
+    cleanup();
+    try{
+      // data can be array of row-objects or a {rows:[]} wrapper
+      const rows = Array.isArray(data) ? data : (data.rows || []);
+      if(!rows.length) throw new Error('No rows returned — check sheet name in Apps Script');
+      rawData = rows;
+      rebuildFilterOptions(); render(); initDrag();
+      showToast('Loaded ' + rows.filter(r=>r.typ!=='ETAP').length + ' tasks ✓','ok');
+    }catch(e){
+      showToast('Parse error: '+e.message,'error');
+      console.error('Gantt JSONP error:',e,data);
+    }
+  };
+  function cleanup(){ clearTimeout(timer); delete window[cbName]; if(script.parentNode) script.remove(); }
+  script.onerror = ()=>{ cleanup(); showToast('Script load failed — check Apps Script URL','error'); };
+  document.head.appendChild(script);
+}
+
+function fetchViaJsonp(){
+  return new Promise((resolve,reject)=>{
+    const cbName='_ganttCb_'+Date.now();
+    const url=SHEETS_CSV_URL+'?callback='+cbName;
+    const script=document.createElement('script');
+    script.src=url;
+    const timer=setTimeout(()=>{cleanup();reject(new Error('Timeout — check the share URL'));},8000);
+    window[cbName]=function(json){
+      cleanup();
+      try{resolve(parseGvizJson(json));}
+      catch(e){reject(e);}
+    };
+    function cleanup(){clearTimeout(timer);delete window[cbName];script.remove();}
+    script.onerror=()=>{cleanup();reject(new Error('Script blocked — sheet may not be shared'));};
+    document.head.appendChild(script);
+  });
+}
+
+function parseGvizJson(json){
+  const cols=json.table.cols.map(c=>c.label||'');
+  const rows=json.table.rows||[];
+  const idx=k=>cols.findIndex(h=>h.includes(k));
+  const iE=idx('Etap'),iI=idx('Item'),iT=idx('Typ'),iO=idx('Opis'),iC=idx('Czas'),iS=idx('Status'),iP=idx('Priorytet');
+  const iTy=cols.findIndex(h=>h.includes('tydzie')||h.includes('tydzień'));
+  const result=[];
+  for(const row of rows){
+    const g=i=>(row.c&&row.c[i]!=null&&row.c[i].v!=null)?row.c[i].v:null;
+    const etapRaw=g(iE);
+    const etap=parseFloat(etapRaw);
+    if(isNaN(etap)&&etapRaw!=='0'&&etapRaw!==0)continue;
+    const czas=parseFloat(g(iC));
+    const typ=String(g(iT)||'').trim();
+    if(!typ)continue;
+      const itemVal=g(iI)!=null?parseFloat(g(iI)):NaN;
+    result.push({
+      etap:isNaN(etap)?0:etap,
+      item:isNaN(itemVal)?null:itemVal,
+      typ,opis:String(g(iO)||'').trim(),
+      czas:isNaN(czas)?null:czas,
+      status:String(g(iS)||'').trim(),
+      priorytet:String(g(iP)||'').trim(),
+      tenTydzen:String(g(iTy)||'').trim().toUpperCase(),
+    });
+  }
+  return result;
+}
+
+function showCorsHelp(){
+  const existing=document.getElementById('cors-help');
+  if(existing){existing.remove();return;}
+  const div=document.createElement('div');div.id='cors-help';
+  div.style.cssText='position:fixed;bottom:60px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--surface);border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:14px 18px;max-width:500px;font-size:12px;box-shadow:0 4px 20px rgba(0,0,0,.2);line-height:1.6;max-height:80vh;overflow-y:auto';
+  div.innerHTML=`<div style="font-weight:600;margin-bottom:8px">Replace your doGet with this JSONP version</div>
+    <div style="color:var(--text-sec);margin-bottom:8px">In Apps Script, <b>replace your entire doGet</b> with the code below, then <b>Deploy → Manage deployments → Edit → New version → Deploy</b>:</div>
+    <pre style="background:var(--bg);padding:8px;border-radius:4px;font-size:10px;overflow:auto;margin-bottom:10px;line-height:1.5">function doGet(e){
+  var cb = e && e.parameter && e.parameter.callback;
+  var ws = SpreadsheetApp.getActiveSpreadsheet()
+           .getSheetByName('📋 Plan główny');
+  var data = ws.getDataRange().getValues();
+  var headers = data[1]; // row 0 = title, row 1 = column headers
+  var colEtap  = headers.indexOf('Etap #');
+  var colItem  = headers.indexOf('Item #');
+  var colTyp   = headers.indexOf('Typ');
+  var colOpis  = headers.indexOf('Opis / zadanie');
+  var colCzas  = headers.indexOf('Czas (h)');
+  var colStat  = headers.indexOf('Status');
+  var colPri   = headers.indexOf('Priorytet');
+  var colTydz  = headers.indexOf('Ten tydzie\u0144?');
+  var rows = [];
+  for(var i = 2; i < data.length; i++){
+    var r = data[i];
+    if(!r[colTyp]) continue;
+    rows.push({
+      etap:     r[colEtap]===''||r[colEtap]==null ? null : Number(r[colEtap]),
+      item:     r[colItem]===''||r[colItem]==null  ? null : Number(r[colItem]),
+      typ:      String(r[colTyp]  || ''),
+      opis:     String(r[colOpis] || ''),
+      czas:     r[colCzas]===''||r[colCzas]==null  ? null : Number(r[colCzas]),
+      status:   String(r[colStat] || ''),
+      priorytet:String(r[colPri]  || ''),
+      tenTydzen:String(r[colTydz] || '').toUpperCase()
+    });
+  }
+  var json = JSON.stringify(rows);
+  var out  = cb ? cb + '(' + json + ')' : json;
+  return ContentService.createTextOutput(out)
+    .setMimeType(cb ? ContentService.MimeType.JAVASCRIPT
+                    : ContentService.MimeType.JSON);
+}</pre>
+    <div style="color:var(--text-sec);font-size:11px;margin-bottom:10px">⚠️ The sheet name line uses the 📋 emoji — paste carefully or type it directly in Apps Script.</div>
+    <button onclick="document.getElementById('cors-help').remove()" style="font-size:11px;padding:4px 10px;border:0.5px solid var(--border-strong);border-radius:4px;background:transparent;cursor:pointer;color:var(--text)">Close</button>`;
+  document.body.appendChild(div);
+}
+
+// ── STATE PERSISTENCE ─────────────────────────────────────────────────────────
+const LS_FILTERS = 'camperHQ_filters';
+const LS_HOURS   = 'camperHQ_dayHours';
+
+function saveState(){
+  const f={};
+  Object.keys(filters).forEach(k=>f[k]=[...filters[k]]);
+  try{localStorage.setItem(LS_FILTERS,JSON.stringify(f));}catch(e){}
+  try{localStorage.setItem(LS_HOURS,JSON.stringify(dayHours));}catch(e){}
+}
+function loadState(){
+  try{
+    const f=JSON.parse(localStorage.getItem(LS_FILTERS)||'{}');
+    Object.keys(filters).forEach(k=>{if(f[k])filters[k]=new Set(f[k]);});
+  }catch(e){}
+  try{
+    const h=JSON.parse(localStorage.getItem(LS_HOURS)||'{}');
+    if(h&&typeof h==='object'){
+      const todayStr=fmtISO(new Date());
+      // Drop stale 0h entries for past dates — these were likely test artifacts
+      // that would block the scheduler from ever using those days
+      Object.keys(h).forEach(k=>{
+        if(h[k]===0&&k<todayStr) delete h[k];
+      });
+      dayHours=h;
+    }
+  }catch(e){}
+}
+
+// ── DRAG-TO-REORDER ──────────────────────────────────────────────────────────
+// Drag a task label row onto another task label within the SAME stage.
+// Drop X onto Y → X gets Y's Item #; Y and everything after shifts up by 1.
+// Optimistic local update shown immediately; user confirms before writing to Sheets.
+
+let dragState = null;
+let pendingReorder = null;
+const ghost = document.getElementById('drag-ghost');
+
+function initDrag() {
+  const container = document.getElementById('labelRows');
+  if (!container) return;
+
+  container.addEventListener('dragstart', e => {
+    const row = e.target.closest('[draggable=true][data-etap]');
+    if (!row) return;
+    dragState = {
+      etap: parseFloat(row.dataset.etap),
+      item: parseFloat(row.dataset.item),
+      opis: row.dataset.opis,
+      sourceEl: row,
+    };
+    row.classList.add('drag-source');
+    ghost.textContent = row.dataset.opis;
+    ghost.style.display = 'block';
+    ghost.style.left = '-9999px';
+    ghost.style.top = '-9999px';
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setDragImage(ghost, 10, 10); } catch(err){}
+    hideTT();
+  });
+
+  container.addEventListener('drag', e => {
+    if (e.clientX === 0 && e.clientY === 0) return;
+    ghost.style.left = (e.clientX + 14) + 'px';
+    ghost.style.top  = (e.clientY - 10) + 'px';
+  });
+
+  container.addEventListener('dragover', e => {
+    if (!dragState) return;
+    const row = e.target.closest('[draggable=true][data-etap]');
+    if (!row) return;
+    // Same item on same stage — no-op
+    if (parseFloat(row.dataset.etap) === dragState.etap && parseFloat(row.dataset.item) === dragState.item) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+    row.classList.add('drop-target');
+  });
+
+  container.addEventListener('dragleave', e => {
+    const row = e.target.closest('[draggable=true][data-etap]');
+    if (row) row.classList.remove('drop-target');
+  });
+
+  container.addEventListener('drop', e => {
+    e.preventDefault();
+    if (!dragState) return;
+    const targetRow = e.target.closest('[draggable=true][data-etap]');
+    if (!targetRow) return cleanupDrag();
+
+    const targetEtap = parseFloat(targetRow.dataset.etap);
+    const targetItem = parseFloat(targetRow.dataset.item);
+    const srcEtap    = dragState.etap;
+    const srcItem    = dragState.item;
+
+    // Drop on itself — no-op
+    if (targetEtap === srcEtap && targetItem === srcItem) return cleanupDrag();
+
+    // Find dragged row in rawData (match by etap + item — globally unique)
+    const draggedRow = rawData.find(r => r.etap === srcEtap && r.item === srcItem && r.typ !== 'ETAP');
+    if (!draggedRow) return cleanupDrag();
+
+    // ── GLOBAL ITEM # RULE ────────────────────────────────────────────────────
+    // Item # is a GLOBAL sequence across all stages (not per-stage).
+    // Dragging X (srcItem) onto Y (targetItem):
+    //   • Every step with Item# >= targetItem, EXCEPT X itself → Item# += 1
+    //   • X itself → Item# = targetItem  (and Etap# = targetEtap if cross-stage)
+    //   • Every step with Item# < targetItem → unchanged
+    //
+    // This means X slots into Y's position; Y and everything after shift up by 1.
+    // X's old position just disappears — no gap-filling of the source.
+
+    const draggedOpis = draggedRow.opis; // unique task name — stable identity key
+
+    const stableUpdates = [];
+    let newRawData = rawData.map(r => {
+      // ETAP header rows and unnumbered rows are never touched
+      if (r.typ === 'ETAP' || r.item == null) return r;
+
+      // ── This IS the dragged row X (matched by opis, globally unique) ──
+      // Only Item # changes — etap stays as-is so the bar keeps its stage colour
+      if (r.opis === draggedOpis) {
+        stableUpdates.push({
+          opis: r.opis,
+          etap: r.etap, oldItem: r.item, newItem: targetItem,
+        });
+        return {...r, item: targetItem};
+      }
+
+      // ── All other rows: shift up by 1 only if Item# >= targetItem ──
+      // Dragged row is excluded above so it never double-counts here.
+      if (r.item >= targetItem) {
+        stableUpdates.push({ opis: r.opis, etap: r.etap, oldItem: r.item, newItem: r.item + 1 });
+        return {...r, item: r.item + 1};
+      }
+
+      // Item# < targetItem → completely untouched
+      return r;
+    });
+
+    if (!stableUpdates.length) return cleanupDrag();
+
+    rawData = newRawData;
+    pendingReorder = { updates: stableUpdates };
+    render();
+    initDrag();
+    showWritebar(dragState.opis, targetRow.dataset.opis, stableUpdates.length);
+    cleanupDrag();
+  });
+
+  container.addEventListener('dragend', () => cleanupDrag());
+}
+
+function cleanupDrag() {
+  if (dragState && dragState.sourceEl) dragState.sourceEl.classList.remove('drag-source');
+  document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+  ghost.style.display = 'none';
+  dragState = null;
+}
+
+function showWritebar(fromName, toName, count) {
+  document.getElementById('wbMsg').textContent =
+    `"${fromName.slice(0,28)}" → before "${toName.slice(0,28)}" · ${count} rows renumbered`;
+  document.getElementById('writebar').classList.add('show');
+}
+
+document.getElementById('wbConfirm').addEventListener('click', () => {
+  if (!pendingReorder) return;
+  document.getElementById('writebar').classList.remove('show');
+  if (!SHEETS_CSV_URL || SHEETS_CSV_URL.includes('YOUR_')) {
+    showToast('Configure SHEETS_CSV_URL to enable write-back.', 'warn'); return;
+  }
+  showToast('Writing to Sheets…', 'info');
+  const payload = JSON.stringify({ action: 'reorder', updates: pendingReorder.updates });
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', SHEETS_CSV_URL, true);
+  xhr.setRequestHeader('Content-Type', 'text/plain');
+  xhr.timeout = 12000;
+  xhr.onload = function(){
+    const text = xhr.responseText;
+    if(text.toLowerCase().includes('error')){
+      showToast('Write failed: '+text.slice(0,100),'error');
+      showWriteScriptHelp();
+    } else {
+      showToast('Sheets updated ✓ — reloading…','ok');
+      pendingReorder = null;
+      setTimeout(loadFromSheets, 900);
+    }
+  };
+  xhr.onerror = function(){ showToast('Network error on write','error'); };
+  xhr.ontimeout = function(){ showToast('Write timed out','error'); };
+  xhr.send(payload);
+});
+
+document.getElementById('wbCancel').addEventListener('click', () => {
+  document.getElementById('writebar').classList.remove('show');
+  pendingReorder = null;
+  loadFromSheets(); // revert optimistic change by reloading
+});
+
+function showWriteScriptHelp() {
+  const existing = document.getElementById('write-help');
+  if (existing) { existing.remove(); return; }
+  const div = document.createElement('div'); div.id = 'write-help';
+  div.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--surface);border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:14px 18px;max-width:500px;font-size:12px;box-shadow:0 4px 20px rgba(0,0,0,.2);line-height:1.6';
+  div.innerHTML = `<div style="font-weight:600;margin-bottom:8px">Add write support to Apps Script</div>
+    <div style="color:var(--text-sec);margin-bottom:8px">Add this <b>doPost</b> function alongside your existing <b>doGet</b>, then <b>redeploy as a new version</b>:</div>
+    <pre style="background:var(--bg);padding:9px;border-radius:4px;font-size:10px;overflow:auto;line-height:1.6;margin-bottom:10px">function doPost(e){
+  try{
+    var payload=JSON.parse(e.postData.contents);
+    if(payload.action!=='reorder') throw new Error('unknown action');
+    var ws=SpreadsheetApp.getActiveSpreadsheet()
+          .getSheetByName('📋 Plan główny');
+    var data=ws.getDataRange().getValues();
+    var headers=data[1];
+    var colEtap=headers.indexOf('Etap #');
+    var colItem=headers.indexOf('Item #');
+    // Match every update by Opis (col index 3) — globally unique task name.
+    // Process HIGHER oldItem first so shifts don't create temporary collisions.
+    var colOpis=3;
+    payload.updates.sort(function(a,b){ return b.oldItem - a.oldItem; });
+    payload.updates.forEach(function(u){
+      for(var i=2;i&lt;data.length;i++){
+        if(String(data[i][colOpis])===String(u.opis)){
+          ws.getRange(i+1,colItem+1).setValue(u.newItem);
+          data[i][colItem]=u.newItem;
+          break;
+        }
+      }
+    });
+    return ContentService
+      .createTextOutput(JSON.stringify({ok:true}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }catch(err){
+    return ContentService
+      .createTextOutput('Error: '+err.message)
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+}</pre>
+    <button onclick="document.getElementById('write-help').remove()" style="font-size:11px;padding:4px 10px;border:0.5px solid var(--border-strong);border-radius:4px;background:transparent;cursor:pointer;color:var(--text)">Close</button>`;
+  document.body.appendChild(div);
+}
+
+document.getElementById('prevWeek').addEventListener('click',()=>{viewWeekOffset--;render();});
+document.getElementById('nextWeek').addEventListener('click',()=>{viewWeekOffset++;render();});
+document.getElementById('todayBtn').addEventListener('click',()=>{viewWeekOffset=0;render();});
+document.getElementById('resetHours').addEventListener('click',()=>{
+  dayHours={};
+  // Force all visible inputs to DEFAULT_HOURS value
+  document.querySelectorAll('#dayInputs input[type=number]').forEach(inp=>{
+    inp.value=DEFAULT_HOURS;
+  });
+  saveState();render();
+});
+document.getElementById('setupBtn').addEventListener('click', showCorsHelp);
+document.getElementById('reloadBtn').addEventListener('click',loadFromSheets);
+document.getElementById('clearStorageBtn').addEventListener('click',()=>{
+  try{localStorage.removeItem(LS_FILTERS);localStorage.removeItem(LS_HOURS);}catch(e){}
+  dayHours={};
+  Object.keys(filters).forEach(k=>filters[k].clear());
+  rebuildFilterOptions();
+  render();
+  showToast('Storage cleared — hours reset to 4h defaults','ok');
+  if(SHEETS_CSV_URL&&!SHEETS_CSV_URL.includes('YOUR_')) loadFromSheets();
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+loadState();                  // restore filters + day hours from last session
+rebuildFilterOptions();       // rebuild dropdowns reflecting restored filters
+render();                     // show immediately (static data while loading)
+initDrag();                   // attach drag handlers to label rows
+syncScroll();
+// Auto-fetch live data if URL is configured — silently updates on top of static
+if(SHEETS_CSV_URL && !SHEETS_CSV_URL.includes('YOUR_')){
+  loadFromSheets();
+}
+</script>
+</body>
+</html>
