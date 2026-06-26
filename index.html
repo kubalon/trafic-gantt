@@ -146,6 +146,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 #tooltip .tt-row{color:var(--text-sec);margin-top:3px}
 .empty-msg{padding:40px 16px;text-align:center;color:var(--text-sec);font-size:13px;width:100%}
 
+
+/* ── RESIZABLE SPLITTER ── */
+#gantt-splitter{
+  width:5px;flex-shrink:0;cursor:col-resize;background:transparent;
+  border-left:1.5px solid var(--border-strong);
+  transition:background .15s;position:relative;z-index:10;
+}
+#gantt-splitter:hover,#gantt-splitter.dragging{background:rgba(50,102,173,.35);}
+#gantt-splitter::after{
+  content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:3px;height:32px;border-radius:2px;background:var(--border-strong);
+}
+
 /* ── DRAG & DROP ── */
 .label-row[draggable=true]{cursor:grab}
 .label-row[draggable=true]:active{cursor:grabbing}
@@ -159,6 +172,179 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 #writebar button:hover{background:var(--bg)}
 #writebar .wb-confirm{background:#3266ad;color:#fff;border-color:#3266ad}
 #writebar .wb-confirm:hover{background:#185FA5}
+
+/* ══ MOBILE VIEW (≤ 680px) ══════════════════════════════════════════════════ */
+@media (max-width: 680px) {
+  body { height:auto; overflow:auto; font-size:14px; }
+
+  /* Topbar: stack title + buttons */
+  .topbar { padding:8px 12px; gap:8px; }
+  .topbar-title span { display:none; }
+  .topbar-right { gap:6px; flex-wrap:wrap; }
+  .sheets-link { display:none; } /* not useful on mobile */
+
+  /* Hide desktop-only panels */
+  .filterbar { display:none; }
+  .timebar   { display:none; }
+  .gantt-outer { display:none; }
+
+  /* Show mobile panel */
+  #mobile-panel { display:flex !important; }
+}
+@media (min-width:681px){
+  #mobile-panel { display:none !important; }
+}
+
+/* Mobile panel layout */
+#mobile-panel {
+  flex-direction:column;
+  flex:1;
+  overflow:hidden;
+  display:none;
+}
+#mobile-filter-bar {
+  display:flex;
+  gap:8px;
+  padding:8px 12px;
+  background:var(--surface);
+  border-bottom:0.5px solid var(--border);
+  flex-shrink:0;
+  flex-wrap:wrap;
+  align-items:center;
+}
+#mobile-filter-bar select {
+  flex:1;
+  min-width:100px;
+  font-size:13px;
+  padding:6px 8px;
+  border:0.5px solid var(--border-strong);
+  border-radius:var(--radius);
+  background:var(--bg);
+  color:var(--text);
+}
+#mobile-filter-bar .mb-clear {
+  font-size:12px;
+  padding:6px 10px;
+  border:0.5px solid var(--border-strong);
+  border-radius:var(--radius);
+  background:transparent;
+  color:var(--text);
+  cursor:pointer;
+  white-space:nowrap;
+}
+#mobile-infobar {
+  padding:6px 12px;
+  font-size:11px;
+  color:var(--text-sec);
+  background:var(--bg);
+  border-bottom:0.5px solid var(--border);
+  flex-shrink:0;
+  display:flex;
+  gap:12px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+#mobile-list {
+  flex:1;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.mb-stage {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:10px 12px 8px;
+  background:var(--bg);
+  border-bottom:0.5px solid var(--border-strong);
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+.mb-stage-num {
+  font-size:11px;
+  font-weight:700;
+  padding:2px 7px;
+  border-radius:4px;
+  color:#fff;
+  flex-shrink:0;
+}
+.mb-stage-name {
+  font-size:13px;
+  font-weight:600;
+  color:var(--text);
+  flex:1;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.mb-stage-h {
+  font-size:11px;
+  color:var(--text-hint);
+  flex-shrink:0;
+}
+.mb-task {
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  padding:11px 12px;
+  border-bottom:0.5px solid var(--border);
+  background:var(--surface);
+}
+.mb-task-bar {
+  width:4px;
+  border-radius:2px;
+  flex-shrink:0;
+  align-self:stretch;
+  min-height:32px;
+}
+.mb-task-body { flex:1; min-width:0; }
+.mb-task-name {
+  font-size:13px;
+  line-height:1.35;
+  color:var(--text);
+  margin-bottom:5px;
+}
+.mb-task-name.urgent { color:#993C1D; font-weight:500; }
+.mb-task-meta {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.mb-date {
+  font-size:11px;
+  color:var(--text-sec);
+}
+.mb-task-right {
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:5px;
+  flex-shrink:0;
+}
+.mb-hours {
+  font-size:12px;
+  font-weight:500;
+  color:var(--text-sec);
+}
+.mb-item-num {
+  font-size:10px;
+  color:var(--text-hint);
+}
+.mb-tw { width:7px;height:7px;border-radius:50%;background:#D4537E;display:inline-block;flex-shrink:0; }
+/* Status colours */
+.mb-status {
+  font-size:10px;
+  padding:1px 6px;
+  border-radius:3px;
+  font-weight:500;
+}
+.ms-done    { background:#d6f0b4;color:#3B6D11 }
+.ms-wip     { background:#FAEEDA;color:#854F0B }
+.ms-blocked { background:#fcd4d4;color:#A32D2D }
+.ms-todo    { background:var(--bg);color:var(--text-sec);border:0.5px solid var(--border-strong) }
+.ms-form    { background:#e8e6f9;color:#534AB7 }
+
 </style>
 </head>
 <body>
@@ -178,9 +364,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 
 <div class="filterbar" id="filterbar"></div>
 
-<div class="legend">
-  <span class="leg"><span style="display:inline-block;width:14px;height:3px;background:var(--today);border-radius:1px"></span> Today</span>
-</div>
+
 
 <div class="timebar">
   <span class="timebar-label">Hours/day:</span>
@@ -192,6 +376,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
     <button class="nav-btn" id="nextWeek">›</button>
     <button class="btn" id="todayBtn">Today</button>
   </div>
+</div>
+
+
+<!-- ══ MOBILE PANEL ═══════════════════════════════════════════════════════════ -->
+<div id="mobile-panel">
+  <div id="mobile-filter-bar">
+    <select id="mb-filter-etap"><option value="">All stages</option></select>
+    <select id="mb-filter-status">
+      <option value="">All statuses</option>
+      <option>Do zrobienia</option><option>W toku</option>
+      <option>Zablokowane</option><option>Zrobione</option><option>W formułowaniu</option>
+    </select>
+    <select id="mb-filter-tydzen">
+      <option value="">All</option><option value="TAK">This week</option>
+    </select>
+    <button class="mb-clear" id="mb-clear">✕</button>
+  </div>
+  <div id="mobile-infobar"></div>
+  <div id="mobile-list"></div>
 </div>
 
 <div class="infobar" id="infobar"></div>
@@ -208,6 +411,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
         <div id="labelRows"></div>
       </div>
     </div>
+    <div id="gantt-splitter"></div>
     <!-- Scrollable timeline -->
     <div class="gantt-timeline" id="ganttTimeline">
       <div class="timeline-head" id="timelineHead"></div>
@@ -227,12 +431,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 <script>
 // ── CONFIG — fill in both values below ──────────────────────────────────────
 // 1. Your Apps Script deployment URL (from Deploy → Manage deployments → copy URL)
-const SHEETS_CSV_URL = 'https://script.google.com/macros/s/AKfycbz-l3s52ma0k0hcXdPG4gA7-orObOD1UopbXhfzbNXyM1yu9MmmKHOf8h4SdoFKDd4/exec';
-// e.g. 'https://script.google.com/macros/s/AKfy.../exec'
+const SHEETS_CSV_URL = 'https://script.google.com/macros/s/AKfycbyx-9eiaU4yrHaavizI3ZsAdi7_Fii28XTb7khvEQXCmoxmgjzIFqqm6h45_qKpBf8/exec';
+// e.g. 'https://...'
 
 // 2. Your Google Sheets edit URL (the browser URL when you have the sheet open)
 const SHEETS_EDIT_URL = 'https://docs.google.com/spreadsheets/d/1P5XhFKVQC3Y4xmgXZDRhx0g2JV13AXe3HxLzKMVAOd0/edit?usp=sharing';
-// e.g. 'https://docs.google.com/spreadsheets/d/1ABC.../edit'
 // e.g. 'https://docs.google.com/spreadsheets/d/1ABC.../edit'
 
 const COL_W = 56;   // px per day column — must match CSS --col
@@ -353,18 +556,40 @@ function applyFilters(stages){
 // Tasks are distributed across ALL days (incl weekends) at getDayAvail(day) hours/day
 function schedule(tasks){
   const today=new Date();today.setHours(0,0,0,0);
-  const deadline=addDays(today,730); // safety: never schedule beyond 2 years
-  let cursor=new Date(today);
+  const deadline=addDays(today,730);
   const used={};
   const avail=d=>{const k=fmtISO(d);const cap=getDayAvail(k);return cap-(used[k]||0);};
   const consume=(d,h)=>{const k=fmtISO(d);used[k]=(used[k]||0)+h;};
   const results=[];
-  for(const task of tasks){
+
+  // ── PASS 1: Zrobione tasks ────────────────────────────────────────────────
+  // These are pinned to their completion date and consume capacity on that date.
+  // They do NOT interact with the cursor so they never affect where pending tasks land.
+  // Past completions: pin to completedDate, consume capacity on that past date.
+  // Today's completions: pin to today, consume today's capacity.
+  // No date: pin to today, consume today's capacity.
+  tasks.filter(t=>t.status==='Zrobione').forEach(task=>{
+    const pinDate=task.completedDate||today;
+    consume(pinDate,task.czas); // consumes capacity on that day
+    results.push({
+      ...task,
+      segs:[{date:pinDate,hours:task.czas,cap:getDayAvail(fmtISO(pinDate))}],
+      startDate:pinDate,
+      endDate:pinDate,
+      pinned:true,
+    });
+  });
+
+  // ── PASS 2: All other tasks in Item # order via cursor ────────────────────
+  // Zablokowane included — they occupy capacity just like any other task.
+  // Cursor starts at today and advances as days fill up.
+  let cursor=new Date(today);
+  tasks.filter(t=>t.status!=='Zrobione').forEach(task=>{
     let rem=task.czas;
     const segs=[];
     let guard=0;
     while(rem>0.001&&cursor<deadline){
-      guard++;if(guard>10000)break; // infinite loop guard
+      guard++;if(guard>10000)break;
       const a=avail(cursor);
       if(a<=0.001){cursor=addDays(cursor,1);continue;}
       const h=Math.min(rem,a);
@@ -376,7 +601,8 @@ function schedule(tasks){
     if(segs.length){
       results.push({...task,segs,startDate:segs[0].date,endDate:segs[segs.length-1].date});
     }
-  }
+  });
+
   return results;
 }
 
@@ -505,9 +731,17 @@ function render(){
   // ── SCHEDULING: flat list from rawData sorted purely by global Item # ──────
   // This is INDEPENDENT of the stage-grouped display structure.
   // We apply the same filters but collect across all stages in global Item # order.
+  const today4sched=new Date(); today4sched.setHours(0,0,0,0);
   const allTasksForSchedule=[];
   rawData.forEach(r=>{
     if(r.typ==='ETAP'||!r.czas||r.czas<=0||r.item==null) return;
+    // ── Zrobione scheduling rule ──────────────────────────────────────────────
+    // completedDate < today  → skip entirely (already done on a past day)
+    // completedDate = today  → include (counts to today's workstack, pin to today)
+    // completedDate missing  → include (status set but no date — treat as today)
+    // Not Zrobione           → include normally
+    // Zrobione before today: still included so their pinned bar shows, scheduler handles them
+    // Zrobione today or no date: included normally, consume today's capacity
     // Apply active filters
     if(filters.etap.size&&!filters.etap.has(String(r.etap))) return;
     if(filters.typ.size&&!filters.typ.has(r.typ)) return;
@@ -600,7 +834,8 @@ function render(){
       labelHTML+=`<div class="label-row" style="height:${ROW_H}px" draggable="true" data-etap="${step.etap}" data-item="${step.item}" data-opis="${step.opis.replace(/`/g,'\\`')}">
         <div class="task-label" style="width:var(--label)">
           <div class="task-icons">
-     
+            <span class="sdot ${dotCls}" title="${step.status}"></span>
+            ${step.tenTydzen==='TAK'?'<span class="tw-star" title="This week"></span>':''}
           </div>
           <span class="task-text${isUrgent?' urgent':''}" title="${step.opis}">${step.opis}</span>
         </div>
@@ -721,7 +956,8 @@ function parseCSV(text){
   // Column indices — log them so we can debug
   const iE=idx('Etap #'), iI=idx('Item #'), iT=idx('Typ'), iO=idx('Opis'), iC=idx('Czas'), iS=idx('Status'), iP=idx('Priorytet');
   const iTy=headers.findIndex(h=>h.includes('tydzie')||h.includes('tydzień')||h.toLowerCase().includes('tydz'));
-  console.log('Gantt col indices — Etap:'+iE+' Item:'+iI+' Typ:'+iT+' Opis:'+iO+' Czas:'+iC+' Status:'+iS+' Pri:'+iP+' Tydz:'+iTy);
+  const iD=idx('Data Zrobione'); // 'Data Zrobione' column
+  console.log('Gantt col indices — Etap:'+iE+' Item:'+iI+' Typ:'+iT+' Opis:'+iO+' Czas:'+iC+' Status:'+iS+' Pri:'+iP+' Tydz:'+iTy+' Completed:'+iD);
   if(iE<0||iI<0||iO<0){console.error('Gantt: critical columns not found in headers:',headers);return null;}
   const res=[];
   for(let i=hi+1;i<lines.length;i++){
@@ -732,15 +968,31 @@ function parseCSV(text){
     if(isNaN(etap)&&etapRaw!=='0')continue;
     const czas=parseFloat((c[iC]||'').trim());
     const itemVal=parseFloat((c[iI]||'').trim());
+    // Parse completedDate — Sheets serialises dates as "DD/MM/YYYY" or ISO strings
+    let completedDate=null;
+    if(iD>=0&&c[iD]){
+      const raw=(c[iD]||'').trim();
+      if(raw){
+        const d=new Date(raw);
+        if(!isNaN(d)) completedDate=d;
+        else{
+          // Try DD/MM/YYYY
+          const m=raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+          if(m) completedDate=new Date(+m[3],+m[2]-1,+m[1]);
+        }
+        if(completedDate) completedDate.setHours(0,0,0,0);
+      }
+    }
     res.push({
       etap:isNaN(etap)?0:etap,
-      item:isNaN(itemVal)?null:itemVal,  // stored as NUMBER, not string
+      item:isNaN(itemVal)?null:itemVal,
       typ:(c[iT]||'').trim(),
       opis:(c[iO]||'').trim(),
       czas:isNaN(czas)?null:czas,
       status:(c[iS]||'').trim(),
       priorytet:(c[iP]||'').trim(),
       tenTydzen:(c[iTy]||'').trim().toUpperCase(),
+      completedDate,
     });
   }
   console.log('Gantt: parsed',res.length,'rows, sample item#s:',res.filter(r=>r.item!=null).slice(0,5).map(r=>r.item));
@@ -773,6 +1025,13 @@ function loadFromSheets(){
       // data can be array of row-objects or a {rows:[]} wrapper
       const rows = Array.isArray(data) ? data : (data.rows || []);
       if(!rows.length) throw new Error('No rows returned — check sheet name in Apps Script');
+      // Parse completedDate ISO strings → Date objects
+      rows.forEach(r=>{
+        if(r.completedDate){
+          const d=new Date(r.completedDate);
+          r.completedDate=isNaN(d)?null:(d.setHours(0,0,0,0),d);
+        }
+      });
       rawData = rows;
       rebuildFilterOptions(); render(); initDrag();
       showToast('Loaded ' + rows.filter(r=>r.typ!=='ETAP').length + ' tasks ✓','ok');
@@ -854,6 +1113,7 @@ function showCorsHelp(){
   var colStat  = headers.indexOf('Status');
   var colPri   = headers.indexOf('Priorytet');
   var colTydz  = headers.indexOf('Ten tydzie\u0144?');
+  var colDone  = headers.indexOf('Data Zrobione');
   var rows = [];
   for(var i = 2; i < data.length; i++){
     var r = data[i];
@@ -862,11 +1122,12 @@ function showCorsHelp(){
       etap:     r[colEtap]===''||r[colEtap]==null ? null : Number(r[colEtap]),
       item:     r[colItem]===''||r[colItem]==null  ? null : Number(r[colItem]),
       typ:      String(r[colTyp]  || ''),
-      opis:     String(r[colOpis] || ''),
-      czas:     r[colCzas]===''||r[colCzas]==null  ? null : Number(r[colCzas]),
-      status:   String(r[colStat] || ''),
-      priorytet:String(r[colPri]  || ''),
-      tenTydzen:String(r[colTydz] || '').toUpperCase()
+      opis:          String(r[colOpis] || ''),
+      czas:          r[colCzas]===''||r[colCzas]==null  ? null : Number(r[colCzas]),
+      status:        String(r[colStat] || ''),
+      priorytet:     String(r[colPri]  || ''),
+      tenTydzen:     String(r[colTydz] || '').toUpperCase(),
+      completedDate: r[colDone] ? new Date(r[colDone]).toISOString() : null
     });
   }
   var json = JSON.stringify(rows);
@@ -1123,6 +1384,154 @@ function showWriteScriptHelp() {
   document.body.appendChild(div);
 }
 
+
+// ── RESIZABLE SPLITTER ────────────────────────────────────────────────────────
+function initSplitter(){
+  const splitter = document.getElementById('gantt-splitter');
+  const labels   = document.querySelector('.gantt-labels');
+  if(!splitter||!labels) return;
+  let startX=0, startW=0;
+  splitter.addEventListener('mousedown', e=>{
+    startX = e.clientX;
+    startW = labels.offsetWidth;
+    splitter.classList.add('dragging');
+    document.body.style.cursor='col-resize';
+    document.body.style.userSelect='none';
+    const onMove = e=>{
+      const delta = e.clientX - startX;
+      const newW  = Math.max(160, Math.min(600, startW + delta));
+      labels.style.width = newW+'px';
+    };
+    const onUp = ()=>{
+      splitter.classList.remove('dragging');
+      document.body.style.cursor='';
+      document.body.style.userSelect='';
+      document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onUp);
+    };
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
+  });
+  // Touch support
+  splitter.addEventListener('touchstart', e=>{
+    startX = e.touches[0].clientX;
+    startW = labels.offsetWidth;
+    splitter.classList.add('dragging');
+    const onMove = e=>{
+      const delta = e.touches[0].clientX - startX;
+      const newW  = Math.max(160, Math.min(600, startW + delta));
+      labels.style.width = newW+'px';
+    };
+    const onEnd = ()=>{
+      splitter.classList.remove('dragging');
+      splitter.removeEventListener('touchmove',onMove);
+      splitter.removeEventListener('touchend',onEnd);
+    };
+    splitter.addEventListener('touchmove',onMove,{passive:true});
+    splitter.addEventListener('touchend',onEnd);
+  },{passive:true});
+}
+
+// ── MOBILE RENDER ─────────────────────────────────────────────────────────────
+function isMobile(){ return window.innerWidth <= 680; }
+
+function renderMobile(){
+  if(!isMobile()) return;
+
+  const etapSel = document.getElementById('mb-filter-etap');
+  if(etapSel.options.length <= 1){
+    getStages().forEach(s=>{
+      const o=document.createElement('option');
+      o.value=String(s.etap);
+      o.textContent='E'+s.etap+': '+s.opis.slice(0,26);
+      etapSel.appendChild(o);
+    });
+  }
+
+  const mbEtap   = etapSel.value;
+  const mbStatus = document.getElementById('mb-filter-status').value;
+  const mbTydzen = document.getElementById('mb-filter-tydzen').value;
+
+  const schedTasks=[];
+  rawData.forEach(r=>{
+    if(r.typ==='ETAP'||!r.czas||r.czas<=0||r.item==null) return;
+    if(mbEtap   && String(r.etap)!==mbEtap) return;
+    if(mbStatus && r.status!==mbStatus) return;
+    if(mbTydzen && r.tenTydzen!==mbTydzen) return;
+    schedTasks.push(r);
+  });
+  schedTasks.sort((a,b)=>Number(a.item)-Number(b.item));
+  const scheduled=schedule(schedTasks);
+
+  const totalH=scheduled.reduce((s,t)=>s+(t.czas||0),0);
+  const lastDate=scheduled.length?scheduled[scheduled.length-1].endDate:null;
+  document.getElementById('mobile-infobar').innerHTML=
+    `<span>${scheduled.length} tasks · ${totalH.toFixed(1)}h</span>`+
+    (lastDate?`<span>Done by: <strong>${fmtLong(lastDate)}</strong></span>`:'');
+
+  const stageMap={};
+  scheduled.forEach(t=>{ if(!stageMap[t.etap])stageMap[t.etap]=[]; stageMap[t.etap].push(t); });
+  const stageOrder=getStages()
+    .filter(s=>(!mbEtap||String(s.etap)===mbEtap)&&stageMap[s.etap]);
+
+  const statusCls={
+    'Zrobione':'ms-done','W toku':'ms-wip','Zablokowane':'ms-blocked',
+    'Do zrobienia':'ms-todo','W formułowaniu':'ms-form'
+  };
+
+  let html='';
+  stageOrder.forEach(stage=>{
+    const sc=STAGE_COLORS[stage.etap]||'#888';
+    const tasks=(stageMap[stage.etap]||[]).slice().sort((a,b)=>Number(a.item)-Number(b.item));
+    const stageH=tasks.reduce((s,t)=>s+(t.czas||0),0);
+    html+=`<div class="mb-stage">
+      <span class="mb-stage-num" style="background:${sc}">${stage.etap}</span>
+      <span class="mb-stage-name">${stage.opis}</span>
+      <span class="mb-stage-h">${stageH.toFixed(1)}h</span>
+    </div>`;
+    tasks.forEach(task=>{
+      const isUrgent=task.priorytet==='Pilne';
+      const scls=statusCls[task.status]||'ms-todo';
+      const startStr=task.startDate?fmtDD(task.startDate):'—';
+      const endStr=task.endDate?fmtDD(task.endDate):'—';
+      const dateStr=task.startDate
+        ?(fmtISO(task.startDate)===fmtISO(task.endDate)?startStr:startStr+' – '+endStr):'—';
+      const barColor=task.status==='Zablokowane'?'#b01a1a':sc;
+      html+=`<div class="mb-task">
+        <div class="mb-task-bar" style="background:${barColor}"></div>
+        <div class="mb-task-body">
+          <div class="mb-task-name${isUrgent?' urgent':''}">
+            ${task.tenTydzen==='TAK'?'<span class="mb-tw"></span> ':''}${task.opis}
+          </div>
+          <div class="mb-task-meta">
+            <span class="badge b-${task.typ}">${task.typ}</span>
+            <span class="mb-status ${scls}">${task.status}</span>
+            <span class="mb-date">📅 ${dateStr}</span>
+          </div>
+        </div>
+        <div class="mb-task-right">
+          <span class="mb-hours">${task.czas}h</span>
+          <span class="mb-item-num">#${task.item}</span>
+        </div>
+      </div>`;
+    });
+  });
+  if(!html) html='<div style="padding:32px 16px;text-align:center;color:var(--text-sec)">No tasks match.</div>';
+  document.getElementById('mobile-list').innerHTML=html;
+}
+
+// Guard: only wire mobile listeners if elements exist
+if(document.getElementById('mb-filter-etap')){
+  ['mb-filter-etap','mb-filter-status','mb-filter-tydzen'].forEach(id=>{
+    document.getElementById(id).addEventListener('change',renderMobile);
+  });
+  document.getElementById('mb-clear').addEventListener('click',()=>{
+    ['mb-filter-etap','mb-filter-status','mb-filter-tydzen'].forEach(id=>{ document.getElementById(id).value=''; });
+    renderMobile();
+  });
+}
+window.addEventListener('resize',()=>{ if(isMobile()) renderMobile(); });
+
 document.getElementById('prevWeek').addEventListener('click',()=>{viewWeekOffset--;render();});
 document.getElementById('nextWeek').addEventListener('click',()=>{viewWeekOffset++;render();});
 document.getElementById('todayBtn').addEventListener('click',()=>{viewWeekOffset=0;render();});
@@ -1147,12 +1556,13 @@ document.getElementById('clearStorageBtn').addEventListener('click',()=>{
 });
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-loadState();                  // restore filters + day hours from last session
-rebuildFilterOptions();       // rebuild dropdowns reflecting restored filters
-render();                     // show immediately (static data while loading)
-initDrag();                   // attach drag handlers to label rows
+loadState();
+rebuildFilterOptions();
+render();
+renderMobile();
+initDrag();
+initSplitter();
 syncScroll();
-// Auto-fetch live data if URL is configured — silently updates on top of static
 if(SHEETS_CSV_URL && !SHEETS_CSV_URL.includes('YOUR_')){
   loadFromSheets();
 }
