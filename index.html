@@ -411,8 +411,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 <script>
 // ── CONFIG — fill in both values below ──────────────────────────────────────
 // 1. Your Apps Script deployment URL (from Deploy → Manage deployments → copy URL)
-const SHEETS_CSV_URL = 'https://script.google.com/macros/s/AKfycbyx-9eiaU4yrHaavizI3ZsAdi7_Fii28XTb7khvEQXCmoxmgjzIFqqm6h45_qKpBf8/exec';
-// e.g. 'https://...'
+const SHEETS_CSV_URL = 'https://script.google.com/macros/s/AKfycbw3t3Qk-nBlwzCp2u5wabw86-1KhZJ-FciRmQ2PS5M1YMHwLZSrhJNP7NKB9m_-Nw/exec';
+// e.g. 'https://script.google.com/macros/s/AKfy.../exec'
 
 // 2. Your Google Sheets edit URL (the browser URL when you have the sheet open)
 const SHEETS_EDIT_URL = 'https://docs.google.com/spreadsheets/d/1P5XhFKVQC3Y4xmgXZDRhx0g2JV13AXe3HxLzKMVAOd0/edit?usp=sharing';
@@ -600,7 +600,16 @@ function buildDayInputs(viewMonday){
     slot.innerHTML=`<label>${DOW_PL[d.getDay()]}<br>${fmtDD(d)}</label><input type="number" min="0" max="16" step="0.5" value="${val}" data-key="${key}">`;
     slot.querySelector('input').addEventListener('change',e=>{
       const v=parseFloat(e.target.value);
-      if(!isNaN(v)&&v>=0){dayHours[key]=v;saveState();render();}
+      if(!isNaN(v)&&v>=0){
+        if(v===DEFAULT_HOURS){
+          delete dayHours[key]; // default — no override needed
+        } else {
+          dayHours[key]=v;
+        }
+        saveState();
+        render();
+        postCapacity(key, v===DEFAULT_HOURS ? null : v);
+      }
     });
     container.appendChild(slot);
   }
@@ -1004,24 +1013,29 @@ function loadFromSheets(){
   window[cbName] = function(data){
     cleanup();
     try{
-      // data can be array of row-objects or a {rows:[]} wrapper
+      // Unpack: new Apps Script returns {rows, capacities}, old returns plain array
       const rows = Array.isArray(data) ? data : (data.rows || []);
       if(!rows.length) throw new Error('No rows returned — check sheet name in Apps Script');
-      // Parse completedDate ISO strings → Date objects, date-portion only
-      // to avoid UTC→local timezone shifts moving the date forward
+
+      // completedDate arrives as "YYYY-MM-DD" string (formatted in Apps Script timezone)
+      // Parse directly to local midnight Date — no UTC shift possible
       rows.forEach(r=>{
         if(r.completedDate){
           const isoM=String(r.completedDate).match(/(\d{4})-(\d{2})-(\d{2})/);
-          if(isoM){
-            r.completedDate=new Date(+isoM[1],+isoM[2]-1,+isoM[3]);
-            r.completedDate.setHours(0,0,0,0);
-          } else {
-            r.completedDate=null;
-          }
+          r.completedDate = isoM ? new Date(+isoM[1],+isoM[2]-1,+isoM[3]) : null;
         }
       });
       rawData = rows;
-      rebuildFilterOptions(); render(); initDrag();
+
+      // Load capacity overrides from sheet — merge into dayHours (sheet wins over localStorage)
+      if(!Array.isArray(data) && data.capacities){
+        Object.entries(data.capacities).forEach(([date,h])=>{
+          dayHours[date] = Number(h);
+        });
+        saveState(); // persist merged capacities locally too
+      }
+
+      rebuildFilterOptions(); render(); if(isMobile()) renderMobile(); initDrag();
       showToast('Loaded ' + rows.filter(r=>r.typ!=='ETAP').length + ' tasks ✓','ok');
     }catch(e){
       showToast('Parse error: '+e.message,'error');
@@ -1619,12 +1633,32 @@ window.addEventListener('orientationchange',()=>{
   setTimeout(()=>{ if(isMobile()) renderMobile(); else render(); }, 150);
 });
 
+// ── CAPACITY WRITE-BACK ───────────────────────────────────────────────────────
+// Posts a single date's capacity override to Sheets.
+// hours=null means "reset to default" — Apps Script deletes the row.
+function postCapacity(date, hours){
+  if(!SHEETS_CSV_URL||SHEETS_CSV_URL.includes('YOUR_')) return; // not configured
+  const payload = JSON.stringify({action:'setCapacity', date, hours});
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', SHEETS_CSV_URL, true);
+  xhr.setRequestHeader('Content-Type','text/plain');
+  xhr.timeout = 10000;
+  xhr.onload = function(){
+    if(xhr.responseText.toLowerCase().includes('error')){
+      console.warn('Capacity write failed:', xhr.responseText);
+    }
+  };
+  xhr.onerror = ()=>console.warn('Capacity write network error');
+  xhr.send(payload);
+}
+
 document.getElementById('prevWeek').addEventListener('click',()=>{viewWeekOffset--;render();});
 document.getElementById('nextWeek').addEventListener('click',()=>{viewWeekOffset++;render();});
 document.getElementById('todayBtn').addEventListener('click',()=>{viewWeekOffset=0;render();});
 document.getElementById('resetHours').addEventListener('click',()=>{
+  // Post null (reset) for every currently overridden date before clearing
+  Object.keys(dayHours).forEach(date=>postCapacity(date, null));
   dayHours={};
-  // Force all visible inputs to DEFAULT_HOURS value
   document.querySelectorAll('#dayInputs input[type=number]').forEach(inp=>{
     inp.value=DEFAULT_HOURS;
   });
