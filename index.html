@@ -947,17 +947,20 @@ function parseCSV(text){
     if(isNaN(etap)&&etapRaw!=='0')continue;
     const czas=parseFloat((c[iC]||'').trim());
     const itemVal=parseFloat((c[iI]||'').trim());
-    // Parse completedDate — Sheets serialises dates as "DD/MM/YYYY" or ISO strings
+    // Parse completedDate — always extract YYYY-MM-DD portion first to avoid
+    // UTC→local timezone shifts (e.g. "2026-06-26T22:00:00Z" shifting to 27th)
     let completedDate=null;
     if(iD>=0&&c[iD]){
       const raw=(c[iD]||'').trim();
       if(raw){
-        const d=new Date(raw);
-        if(!isNaN(d)) completedDate=d;
-        else{
-          // Try DD/MM/YYYY
-          const m=raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-          if(m) completedDate=new Date(+m[3],+m[2]-1,+m[1]);
+        // ISO date: take only the date part before any T
+        const isoM=raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if(isoM){
+          completedDate=new Date(+isoM[1],+isoM[2]-1,+isoM[3]);
+        } else {
+          // DD/MM/YYYY fallback
+          const dmyM=raw.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+          if(dmyM) completedDate=new Date(+dmyM[3],+dmyM[2]-1,+dmyM[1]);
         }
         if(completedDate) completedDate.setHours(0,0,0,0);
       }
@@ -1004,11 +1007,17 @@ function loadFromSheets(){
       // data can be array of row-objects or a {rows:[]} wrapper
       const rows = Array.isArray(data) ? data : (data.rows || []);
       if(!rows.length) throw new Error('No rows returned — check sheet name in Apps Script');
-      // Parse completedDate ISO strings → Date objects
+      // Parse completedDate ISO strings → Date objects, date-portion only
+      // to avoid UTC→local timezone shifts moving the date forward
       rows.forEach(r=>{
         if(r.completedDate){
-          const d=new Date(r.completedDate);
-          r.completedDate=isNaN(d)?null:(d.setHours(0,0,0,0),d);
+          const isoM=String(r.completedDate).match(/(\d{4})-(\d{2})-(\d{2})/);
+          if(isoM){
+            r.completedDate=new Date(+isoM[1],+isoM[2]-1,+isoM[3]);
+            r.completedDate.setHours(0,0,0,0);
+          } else {
+            r.completedDate=null;
+          }
         }
       });
       rawData = rows;
