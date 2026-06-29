@@ -1213,20 +1213,22 @@ function initDrag() {
 
     var el = getScrollEl();
     if (!el) return;
-    var r    = el.getBoundingClientRect();
-    var top  = r.top;
-    var bot  = Math.min(r.bottom, window.innerHeight);
-    var ZONE = 80;  // px zone from edge — cursor enters here to start slow scroll
-    var MAX  = 20;  // max px/frame at the very edge
+    // For top boundary use #timelineRows (excludes sticky column headers inside #ganttTimeline)
+    var rowsEl = document.getElementById('timelineRows') || el;
+    var rRows  = rowsEl.getBoundingClientRect();
+    var rEl    = el.getBoundingClientRect();
+    var top  = Math.max(rRows.top, 0);               // first visible task row
+    var bot  = Math.min(rEl.bottom, window.innerHeight); // visible bottom of scroller
+    var ZONE = 120; // px — scroll zone depth from each edge
+    var MAX  = 22;  // px/frame at the boundary
 
     var delta = 0;
     if (cursorY < top + ZONE) {
-      // How far past the zone boundary? 0 at zone edge, 1 at list top
-      var ratio = 1 - Math.max(0, cursorY - top) / ZONE;
-      delta = -Math.ceil(MAX * ratio * ratio); // quadratic: slow→fast
+      var ratio = 1 - Math.max(0, cursorY - top) / ZONE;  // 1 at top edge, 0 at zone far end
+      delta = -Math.round(MAX * ratio * ratio);             // quadratic: slow entering, fast at edge
     } else if (cursorY > bot - ZONE) {
       var ratio2 = 1 - Math.max(0, bot - cursorY) / ZONE;
-      delta = Math.ceil(MAX * ratio2 * ratio2);
+      delta = Math.round(MAX * ratio2 * ratio2);
     }
 
     if (delta !== 0) {
@@ -1386,16 +1388,24 @@ function initDrag() {
   function onTE(e) {
     if (!touchPend) return;
     clearTimeout(touchPend.timer);
+    var pend = touchPend;
+    touchPend = null; // clear BEFORE execDrop to prevent re-entry
     if (dragState) {
       var t = e.changedTouches[0];
-      ghost.style.display = 'none';
+      ghost.style.display = 'none'; // hide ghost BEFORE elementFromPoint
       var under = document.elementFromPoint(t.clientX, t.clientY);
-      ghost.style.display = 'none';
+      // ghost stays hidden — cleanupDrag/execDrop handle final cleanup
       var trow = under && under.closest('[data-etap][data-item]');
-      stopTick(); cursorY = -1;
-      execDrop(trow && trow !== touchPend.row ? trow : null);
+      stopTick();
+      cursorY = -1;
+      // Clear all drop highlights now
+      document.querySelectorAll('.drop-target').forEach(function(x){ x.classList.remove('drop-target'); });
+      if (trow && trow !== pend.row) {
+        execDrop(trow);
+      } else {
+        cleanupDrag();
+      }
     }
-    touchPend = null;
   }
 
   // Store fns FIRST so attachTouchTo can reference them
