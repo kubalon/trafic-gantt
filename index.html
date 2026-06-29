@@ -1203,19 +1203,27 @@ function initDrag() {
   // ── Auto-scroll (runs every frame while dragging) ─────────────────────────
   function scrollStep() {
     if (!dragState) { scrollRaf = null; return; }
-    var ZONE = 160, MAX = 20, y = lastDragY, vh = window.innerHeight;
-    if (y >= 0) {
-      var delta = 0;
-      if (y < ZONE)        delta = -MAX * Math.pow(1 - y / ZONE, 1.2);
-      else if (y > vh - ZONE) delta = MAX * Math.pow(1 - (vh - y) / ZONE, 1.2);
-      if (Math.abs(delta) > 0.5) {
-        var tl = document.getElementById('ganttTimeline');
-        var ml = document.getElementById('mobile-list');
-        var ls = document.getElementById('labelsScroll');
-        if (tl) tl.scrollTop += delta;
-        if (ml) ml.scrollTop += delta;
-        if (ls && tl) ls.scrollTop = tl.scrollTop;
-      }
+
+    // Get the bounding rect of the actual scrollable list container
+    var tl   = document.getElementById('ganttTimeline');
+    var ml   = document.getElementById('mobile-list');
+    var ls   = document.getElementById('labelsScroll');
+    var scrollEl = (tl && tl.offsetParent) ? tl : ml;
+    if (!scrollEl) { scrollRaf = requestAnimationFrame(scrollStep); return; }
+
+    var rect  = scrollEl.getBoundingClientRect();
+    var y     = lastDragY;
+    var EDGE  = 6;   // px — trigger zone right at the border
+    var MAX   = 18;  // px per frame max speed
+
+    var delta = 0;
+    if (y < rect.top + EDGE)         delta = -MAX; // cursor above list top edge
+    else if (y > rect.bottom - EDGE) delta =  MAX; // cursor below list bottom edge
+
+    if (delta !== 0) {
+      if (tl) tl.scrollTop += delta;
+      if (ml) ml.scrollTop += delta;
+      if (ls && tl) ls.scrollTop = tl.scrollTop;
     }
     scrollRaf = requestAnimationFrame(scrollStep);
   }
