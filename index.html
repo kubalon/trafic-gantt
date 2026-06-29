@@ -556,7 +556,6 @@ function schedule(tasks){
   // No date: pin to today, consume today's capacity.
   tasks.filter(t=>t.status==='Zrobione').forEach(task=>{
     const pinDate=task.completedDate||today;
-    console.log('Scheduling Zrobione:',task.opis.slice(0,30),'completedDate:',task.completedDate,'pinDate:',fmtISO(pinDate));
     consume(pinDate,task.czas); // consumes capacity on that day
     results.push({
       ...task,
@@ -941,7 +940,6 @@ function parseCSV(text){
   }
   if(hi<0){console.error('Gantt: header row not found. First 3 lines:',lines.slice(0,3));return null;}
   const headers=parseCSVRow(lines[hi]).map(h=>h.trim().replace(/^"|"$/g,''));
-  console.log('Gantt CSV headers:',headers);
   // Exact match first, partial fallback
   const idx=k=>{
     const ex=headers.findIndex(h=>h===k);
@@ -952,7 +950,6 @@ function parseCSV(text){
   const iE=idx('Etap #'), iI=idx('Item #'), iT=idx('Typ'), iO=idx('Opis'), iC=idx('Czas'), iS=idx('Status'), iP=idx('Priorytet');
   const iTy=headers.findIndex(h=>h.includes('tydzie')||h.includes('tydzień')||h.toLowerCase().includes('tydz'));
   const iD=idx('Data Zrobione'); // 'Data Zrobione' column
-  console.log('Gantt col indices — Etap:'+iE+' Item:'+iI+' Typ:'+iT+' Opis:'+iO+' Czas:'+iC+' Status:'+iS+' Pri:'+iP+' Tydz:'+iTy+' Completed:'+iD);
   if(iE<0||iI<0||iO<0){console.error('Gantt: critical columns not found in headers:',headers);return null;}
   const res=[];
   for(let i=hi+1;i<lines.length;i++){
@@ -993,7 +990,6 @@ function parseCSV(text){
       completedDate,
     });
   }
-  console.log('Gantt: parsed',res.length,'rows, sample item#s:',res.filter(r=>r.item!=null).slice(0,5).map(r=>r.item));
   return res;
 }
 let _toast;
@@ -1212,8 +1208,10 @@ function initDrag() {
     if (!el) return;
     // top = first task row (below sticky headers); bot = visible bottom of scroll container
     var rowsEl = document.getElementById('timelineRows') || el;
-    var top = Math.max(rowsEl.getBoundingClientRect().top, 0);
-    var bot = Math.min(el.getBoundingClientRect().bottom, window.innerHeight);
+    var rRowsTop = rowsEl.getBoundingClientRect().top;
+    var rElBot   = el.getBoundingClientRect().bottom;
+    var top = Math.max(rRowsTop, 0);
+    var bot = Math.min(rElBot, window.innerHeight);
     // ZONE: how many px OUTSIDE the boundary before reaching max speed
     // Scroll starts the instant cursor crosses top/bot, accelerates as it goes further outside
     var ZONE = 80;  // px outside boundary = full speed
@@ -1278,7 +1276,12 @@ function initDrag() {
   var container = document.getElementById('labelRows');
   if (!container) return;
 
-  function onDocMove(e) {
+  // onDocDragOver fires on the whole document by always calling preventDefault.
+  // This is the ONLY reliable way to track cursor position during HTML5 drag —
+  // mousemove is suppressed by browsers during drag, and dragover only fires
+  // on elements that call preventDefault (which wouldn't cover headers/empty space).
+  function onDocDragOver(e) {
+    e.preventDefault(); // must call this to receive dragover everywhere
     if (!dragState) return;
     cursorY = e.clientY;
     ghost.style.left = (e.clientX + 14) + 'px';
@@ -1296,8 +1299,7 @@ function initDrag() {
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setDragImage(ghost, 10, 10); } catch(x) {}
     hideTT();
-    document.addEventListener('mousemove', onDocMove);
-    document.addEventListener('dragover',  onDocMove);
+    document.addEventListener('dragover', onDocDragOver);
     startTick();
   });
 
@@ -1306,7 +1308,7 @@ function initDrag() {
     var row = e.target.closest('[draggable=true][data-etap]');
     if (!row) return;
     if (parseFloat(row.dataset.etap) === dragState.etap && parseFloat(row.dataset.item) === dragState.item) return;
-    e.preventDefault();
+    // e.preventDefault() is handled by onDocDragOver on document — no need here
     document.querySelectorAll('.drop-target').forEach(function(x){ x.classList.remove('drop-target'); });
     row.classList.add('drop-target');
   });
@@ -1324,8 +1326,7 @@ function initDrag() {
   container.addEventListener('dragend', function() {
     stopTick();
     cursorY = -1;
-    document.removeEventListener('mousemove', onDocMove);
-    document.removeEventListener('dragover',  onDocMove);
+    document.removeEventListener('dragover', onDocDragOver);
     cleanupDrag();
   });
 
