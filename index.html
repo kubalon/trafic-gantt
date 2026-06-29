@@ -1192,107 +1192,121 @@ let pendingReorder = null;
 const ghost = document.getElementById('drag-ghost');
 
 function initDrag() {
-  const container = document.getElementById('labelRows');
-  if (!container) return;
+  // ── Drag state ─────────────────────────────────────────────────────────────
+  var rafId      = null;
+  var cursorY    = -1;
+  var touchPend  = null;
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  var scrollRaf  = null;
-  var lastDragY  = -1;
-  var touchState = null; // for mobile touch drag
-
-  // ── Auto-scroll (runs every frame while dragging) ─────────────────────────
-  // Triggers ONLY when cursor is at the very top or bottom edge of the visible list.
-  // Uses the intersection of the scroll container rect with the viewport.
-  var _listRect = null; // cached on dragstart, recomputed each drag
-
-  function getListRect() {
-    var tl = document.getElementById('ganttTimeline');
+  // ── Scroll ─────────────────────────────────────────────────────────────────
+  // Triggered ONLY when cursor is within EDGE px of the ACTUAL list boundary.
+  // We measure the boundary fresh each frame so it always reflects current layout.
+  function getScrollEl() {
     var ml = document.getElementById('mobile-list');
-    var el = (ml && ml.offsetParent) ? ml : tl;
-    if (!el) return null;
-    var r = el.getBoundingClientRect();
-    // Clamp to actual viewport so sticky headers and off-screen bottom are excluded
-    return {
-      top:    Math.max(r.top, 0),
-      bottom: Math.min(r.bottom, window.innerHeight),
-    };
+    if (ml && getComputedStyle(ml).display !== 'none') return ml;
+    return document.getElementById('ganttTimeline');
   }
 
-  function scrollStep() {
-    if (!dragState) { scrollRaf = null; return; }
-    var rect = _listRect || getListRect();
-    if (!rect) { scrollRaf = requestAnimationFrame(scrollStep); return; }
+  function tick() {
+    if (!dragState) { rafId = null; return; }
+    rafId = requestAnimationFrame(tick);
+    if (cursorY < 0) return;
 
-    var y    = lastDragY;
-    var EDGE = 4;   // px band right at the border edge
-    var SPD  = 16;  // px per frame
+    var el = getScrollEl();
+    if (!el) return;
+    var r    = el.getBoundingClientRect();
+    var top  = r.top;
+    var bot  = Math.min(r.bottom, window.innerHeight);
+    var ZONE = 80;  // px zone from edge — cursor enters here to start slow scroll
+    var MAX  = 20;  // max px/frame at the very edge
 
     var delta = 0;
-    if      (y <= rect.top    + EDGE) delta = -SPD;
-    else if (y >= rect.bottom - EDGE) delta =  SPD;
+    if (cursorY < top + ZONE) {
+      // How far past the zone boundary? 0 at zone edge, 1 at list top
+      var ratio = 1 - Math.max(0, cursorY - top) / ZONE;
+      delta = -Math.ceil(MAX * ratio * ratio); // quadratic: slow→fast
+    } else if (cursorY > bot - ZONE) {
+      var ratio2 = 1 - Math.max(0, bot - cursorY) / ZONE;
+      delta = Math.ceil(MAX * ratio2 * ratio2);
+    }
 
     if (delta !== 0) {
-      var tl = document.getElementById('ganttTimeline');
-      var ml = document.getElementById('mobile-list');
+      el.scrollTop += delta;
       var ls = document.getElementById('labelsScroll');
-      if (tl) tl.scrollTop += delta;
-      if (ml) ml.scrollTop += delta;
-      if (ls && tl) ls.scrollTop = tl.scrollTop;
+      if (ls) ls.scrollTop = el.scrollTop;
     }
-    scrollRaf = requestAnimationFrame(scrollStep);
   }
 
-  function startScrollLoop() {
-    if (!scrollRaf) scrollRaf = requestAnimationFrame(scrollStep);
-  }
-  function stopScrollLoop() {
-    if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
+  function startTick() { if (!rafId) rafId = requestAnimationFrame(tick); }
+  function stopTick()  { if (rafId)  { cancelAnimationFrame(rafId); rafId = null; } }
+
+  // ── Drop logic (shared) ────────────────────────────────────────────────────
+  function execDrop(targetRow) {
+    if (!dragState || !targetRow) return cleanupDrag();
+    var tEtap = parseFloat(targetRow.dataset.etap);
+    var tItem = parseFloat(targetRow.dataset.item);
+    if (tEtap === dragState.etap && tItem === dragState.item) return cleanupDrag();
+
+    var src = rawData.find(function(r) {
+      return r.etap === dragState.etap && r.item === dragState.item && r.typ !== 'ETAP';
+    });
+    if (!src) return cleanupDrag();
+
+    var updates = [];
+    rawData = rawData.map(function(r) {
+      if (r.typ === 'ETAP' || r.item == null) return r;
+      if (r.opis === src.opis) {
+        updates.push({ opis: r.opis, etap: r.etap, oldItem: r.item, newItem: tItem });
+        return Object.assign({}, r, { item: tItem });
+      }
+      if (r.item >= tItem) {
+        updates.push({ opis: r.opis, etap: r.etap, oldItem: r.item, newItem: r.item + 1 });
+        return Object.assign({}, r, { item: r.item + 1 });
+      }
+      return r;
+    });
+
+    if (!updates.length) return cleanupDrag();
+    pendingReorder = { updates: updates };
+    showWritebar(dragState.opis, targetRow.dataset.opis, updates.length);
+    cleanupDrag();
+    render();
+    initDrag();
   }
 
-  // ── Track cursor position (both dragover AND mousemove for full coverage) ──
-  function onMove(e) {
+  // ── Desktop drag (HTML5) ───────────────────────────────────────────────────
+  var container = document.getElementById('labelRows');
+  if (!container) return;
+
+  function onDocMove(e) {
     if (!dragState) return;
-    var clientX = e.clientX !== undefined ? e.clientX : (e.touches ? e.touches[0].clientX : 0);
-    var clientY = e.clientY !== undefined ? e.clientY : (e.touches ? e.touches[0].clientY : 0);
-    lastDragY = clientY;
-    ghost.style.left = (clientX + 14) + 'px';
-    ghost.style.top  = (clientY - 10) + 'px';
-    startScrollLoop();
+    cursorY = e.clientY;
+    ghost.style.left = (e.clientX + 14) + 'px';
+    ghost.style.top  = (e.clientY - 10) + 'px';
   }
 
-  // ── Desktop drag events ────────────────────────────────────────────────────
   container.addEventListener('dragstart', function(e) {
     var row = e.target.closest('[draggable=true][data-etap]');
     if (!row) return;
-    dragState = {
-      etap: parseFloat(row.dataset.etap),
-      item: parseFloat(row.dataset.item),
-      opis: row.dataset.opis,
-      sourceEl: row,
-    };
+    dragState = { etap: parseFloat(row.dataset.etap), item: parseFloat(row.dataset.item), opis: row.dataset.opis, sourceEl: row };
     row.classList.add('drag-source');
     ghost.textContent = row.dataset.opis;
     ghost.style.display = 'block';
-    ghost.style.left = '-9999px';
-    ghost.style.top  = '-9999px';
+    ghost.style.left = '-9999px'; ghost.style.top = '-9999px';
     e.dataTransfer.effectAllowed = 'move';
-    try { e.dataTransfer.setDragImage(ghost, 10, 10); } catch(err) {}
+    try { e.dataTransfer.setDragImage(ghost, 10, 10); } catch(x) {}
     hideTT();
-    _listRect = getListRect(); // cache before drag ghost affects layout
-    document.addEventListener('dragover', onMove);
-    document.addEventListener('mousemove', onMove);
-    startScrollLoop();
+    document.addEventListener('mousemove', onDocMove);
+    document.addEventListener('dragover',  onDocMove);
+    startTick();
   });
 
   container.addEventListener('dragover', function(e) {
     if (!dragState) return;
     var row = e.target.closest('[draggable=true][data-etap]');
     if (!row) return;
-    if (parseFloat(row.dataset.etap) === dragState.etap &&
-        parseFloat(row.dataset.item) === dragState.item) return;
+    if (parseFloat(row.dataset.etap) === dragState.etap && parseFloat(row.dataset.item) === dragState.item) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    document.querySelectorAll('.drop-target').forEach(function(el) { el.classList.remove('drop-target'); });
+    document.querySelectorAll('.drop-target').forEach(function(x){ x.classList.remove('drop-target'); });
     row.classList.add('drop-target');
   });
 
@@ -1303,128 +1317,93 @@ function initDrag() {
 
   container.addEventListener('drop', function(e) {
     e.preventDefault();
-    var row = e.target.closest('[draggable=true][data-etap]');
-    handleDrop(row);
+    execDrop(e.target.closest('[draggable=true][data-etap]'));
   });
 
   container.addEventListener('dragend', function() {
-    stopScrollLoop();
-    _listRect = null;
-    document.removeEventListener('dragover', onMove);
-    document.removeEventListener('mousemove', onMove);
+    stopTick();
+    cursorY = -1;
+    document.removeEventListener('mousemove', onDocMove);
+    document.removeEventListener('dragover',  onDocMove);
     cleanupDrag();
   });
 
-  // ── Mobile touch drag (long-press 400ms to initiate) ─────────────────────
-  container.addEventListener('touchstart', function(e) {
-    var row = e.target.closest('[draggable=true][data-etap]');
-    if (!row) return;
-    var t0 = e.touches[0];
-    touchState = {
-      row: row,
-      startX: t0.clientX, startY: t0.clientY,
-      timer: setTimeout(function() {
-        dragState = {
-          etap: parseFloat(row.dataset.etap),
-          item: parseFloat(row.dataset.item),
-          opis: row.dataset.opis,
-          sourceEl: row,
-        };
-        row.classList.add('drag-source');
-        ghost.textContent = row.dataset.opis;
-        ghost.style.display = 'block';
-        ghost.style.left = (t0.clientX + 14) + 'px';
-        ghost.style.top  = (t0.clientY - 10) + 'px';
-        if (navigator.vibrate) navigator.vibrate(40);
-        startScrollLoop();
-      }, 400),
-    };
-  }, {passive: true});
+  // ── Mobile touch drag ──────────────────────────────────────────────────────
+  function attachTouchTo(el) {
+    if (!el) return;
+    // Always use window._ganttTouchFns so this works when called from outside initDrag
+    var fns = window._ganttTouchFns || { onTS: onTS, onTM: onTM, onTE: onTE };
+    el.removeEventListener('touchstart', fns.onTS);
+    el.removeEventListener('touchmove',  fns.onTM);
+    el.removeEventListener('touchend',   fns.onTE);
+    el.addEventListener('touchstart', fns.onTS, { passive: true });
+    el.addEventListener('touchmove',  fns.onTM, { passive: false });
+    el.addEventListener('touchend',   fns.onTE, { passive: true });
+  }
 
-  container.addEventListener('touchmove', function(e) {
-    if (!touchState) return;
+  function onTS(e) {
+    var row = e.target.closest('[data-etap][data-item]');
+    if (!row) return;
+    var t = e.touches[0];
+    touchPend = {
+      row: row, x0: t.clientX, y0: t.clientY,
+      timer: setTimeout(function() {
+        dragState = { etap: parseFloat(row.dataset.etap), item: parseFloat(row.dataset.item), opis: row.dataset.opis, sourceEl: row };
+        row.classList.add('drag-source');
+        var label = row.dataset.opis || (row.querySelector('.mb-task-name')||{}).textContent || '';
+        ghost.textContent = label;
+        ghost.style.display = 'block';
+        ghost.style.left = (t.clientX + 14) + 'px';
+        ghost.style.top  = (t.clientY - 10) + 'px';
+        if (navigator.vibrate) navigator.vibrate(50);
+        cursorY = t.clientY;
+        startTick();
+      }, 450),
+    };
+  }
+
+  function onTM(e) {
+    if (!touchPend) return;
     var t = e.touches[0];
     if (!dragState) {
-      // Cancel long-press if moved before 400ms
-      if (Math.abs(t.clientX - touchState.startX) > 8 ||
-          Math.abs(t.clientY - touchState.startY) > 8) {
-        clearTimeout(touchState.timer);
-        touchState = null;
+      if (Math.abs(t.clientX - touchPend.x0) > 8 || Math.abs(t.clientY - touchPend.y0) > 8) {
+        clearTimeout(touchPend.timer); touchPend = null;
       }
       return;
     }
     e.preventDefault();
-    lastDragY = t.clientY;
+    cursorY = t.clientY;
     ghost.style.left = (t.clientX + 14) + 'px';
     ghost.style.top  = (t.clientY - 10) + 'px';
-    // Highlight drop target under finger
     ghost.style.display = 'none';
-    var el = document.elementFromPoint(t.clientX, t.clientY);
+    var under = document.elementFromPoint(t.clientX, t.clientY);
     ghost.style.display = 'block';
-    document.querySelectorAll('.drop-target').forEach(function(x) { x.classList.remove('drop-target'); });
-    var trow = el && el.closest('[draggable=true][data-etap]');
-    if (trow && trow !== touchState.row) trow.classList.add('drop-target');
-  }, {passive: false});
+    document.querySelectorAll('.drop-target').forEach(function(x){ x.classList.remove('drop-target'); });
+    var trow = under && under.closest('[data-etap][data-item]');
+    if (trow && trow !== touchPend.row) trow.classList.add('drop-target');
+  }
 
-  container.addEventListener('touchend', function(e) {
-    if (!touchState) return;
-    clearTimeout(touchState.timer);
+  function onTE(e) {
+    if (!touchPend) return;
+    clearTimeout(touchPend.timer);
     if (dragState) {
       var t = e.changedTouches[0];
       ghost.style.display = 'none';
-      var el = document.elementFromPoint(t.clientX, t.clientY);
+      var under = document.elementFromPoint(t.clientX, t.clientY);
       ghost.style.display = 'none';
-      var trow = el && el.closest('[draggable=true][data-etap]');
-      stopScrollLoop();
-      if (trow && trow !== touchState.row) {
-        handleDrop(trow);
-      } else {
-        cleanupDrag();
-      }
+      var trow = under && under.closest('[data-etap][data-item]');
+      stopTick(); cursorY = -1;
+      execDrop(trow && trow !== touchPend.row ? trow : null);
     }
-    touchState = null;
-  }, {passive: true});
-
-  // ── handleDrop: shared by mouse drop and touch end ─────────────────────────
-  function handleDrop(targetRow) {
-    if (!dragState || !targetRow) return cleanupDrag();
-    var targetEtap = parseFloat(targetRow.dataset.etap);
-    var targetItem = parseFloat(targetRow.dataset.item);
-    var srcEtap    = dragState.etap;
-    var srcItem    = dragState.item;
-    if (targetEtap === srcEtap && targetItem === srcItem) return cleanupDrag();
-
-    var draggedRow = rawData.find(function(r) {
-      return r.etap === srcEtap && r.item === srcItem && r.typ !== 'ETAP';
-    });
-    if (!draggedRow) return cleanupDrag();
-
-    var draggedOpis  = draggedRow.opis;
-    var stableUpdates = [];
-    var newRawData = rawData.map(function(r) {
-      if (r.typ === 'ETAP' || r.item == null) return r;
-      if (r.opis === draggedOpis) {
-        stableUpdates.push({opis: r.opis, etap: r.etap, oldItem: r.item, newItem: targetItem});
-        return Object.assign({}, r, {item: targetItem});
-      }
-      if (r.item >= targetItem) {
-        stableUpdates.push({opis: r.opis, etap: r.etap, oldItem: r.item, newItem: r.item + 1});
-        return Object.assign({}, r, {item: r.item + 1});
-      }
-      return r;
-    });
-
-    if (!stableUpdates.length) return cleanupDrag();
-    rawData = newRawData;
-    pendingReorder = {updates: stableUpdates};
-    render();
-    initDrag();
-    showWritebar(dragState.opis, targetRow.dataset.opis, stableUpdates.length);
-    cleanupDrag();
+    touchPend = null;
   }
 
+  // Store fns FIRST so attachTouchTo can reference them
+  window._ganttTouchFns      = { onTS: onTS, onTM: onTM, onTE: onTE };
+  window._ganttAttachTouchTo = attachTouchTo;
+  attachTouchTo(container);
+  attachTouchTo(document.getElementById('mobile-list'));
 }
-
 
 function cleanupDrag() {
   if (dragState && dragState.sourceEl) dragState.sourceEl.classList.remove('drag-source');
@@ -1735,7 +1714,7 @@ function renderMobile(){
           ?`${task._segHours.toFixed(1)}h / ${task.czas}h`
           :`${task.czas}h`;
 
-        html+=`<div class="mb-task">
+        html+=`<div class="mb-task" draggable="true" data-etap="${task.etap}" data-item="${task.item}" data-opis="${(task.opis||'').replace(/`/g,'\\`').replace(/"/g,'&quot;')}">
           <div class="mb-task-bar" style="background:${barColor}"></div>
           <div class="mb-task-body">
             <div class="mb-task-name${isUrgent?' urgent':''}">
@@ -1756,6 +1735,20 @@ function renderMobile(){
   });
 
   document.getElementById('mobile-list').innerHTML=html;
+  // Re-attach touch drag listeners to the rebuilt list
+  if (window._ganttAttachTouchTo && window._ganttTouchFns) {
+    window._ganttAttachTouchTo(document.getElementById('mobile-list'));
+  }
+  // Re-attach touch drag listeners after list is rebuilt
+  var mbl2 = document.getElementById('mobile-list');
+  if (mbl2 && window._mobileInitDragDone) {
+    mbl2.removeEventListener('touchstart', window._onMobileTouchStart);
+    mbl2.removeEventListener('touchmove',  window._onMobileTouchMove);
+    mbl2.removeEventListener('touchend',   window._onMobileTouchEnd);
+    mbl2.addEventListener('touchstart', window._onMobileTouchStart, {passive:true});
+    mbl2.addEventListener('touchmove',  window._onMobileTouchMove,  {passive:false});
+    mbl2.addEventListener('touchend',   window._onMobileTouchEnd,   {passive:true});
+  }
 }
 
 window.addEventListener('resize',()=>{ if(isMobile()) renderMobile(); });
