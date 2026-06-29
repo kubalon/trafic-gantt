@@ -666,7 +666,7 @@ document.addEventListener('click',()=>document.querySelectorAll('.ms-dropdown.op
 
 function rebuildFilterOptions(){
   const stages=getStages();
-  const etapOpts=stages.map(s=>({value:String(s.etap),label:`E${s.etap}: ${s.opis.slice(0,24)}`}));
+  const etapOpts=stages.map(s=>({value:String(s.etap),label:`E${s.etap}: ${(s.opis||'').slice(0,24)}`}));
   const typOpts=[{value:'ZADANIE',label:'ZADANIE'},{value:'DECYZJA',label:'DECYZJA'},{value:'ZAKUP',label:'ZAKUP'}];
   const priOpts=['Pilne','Wysoki','Normalny'].map(v=>({value:v,label:v}));
   const tydOpts=[{value:'TAK',label:'Yes — this week'},{value:'NIE',label:'No'}];
@@ -1206,26 +1206,24 @@ function initDrag() {
 
     var el = getScrollEl();
     if (!el) return;
-    // top = first task row (below sticky headers); bot = visible bottom of scroll container
-    var rowsEl = document.getElementById('timelineRows') || el;
-    var rRowsTop = rowsEl.getBoundingClientRect().top;
-    var rElBot   = el.getBoundingClientRect().bottom;
-    var top = Math.max(rRowsTop, 0);
-    var bot = Math.min(rElBot, window.innerHeight);
-    // ZONE: how many px OUTSIDE the boundary before reaching max speed
-    // Scroll starts the instant cursor crosses top/bot, accelerates as it goes further outside
-    var ZONE = 80;  // px outside boundary = full speed
-    var MAX  = 20;  // px/frame at max
+    // Use the scroll container's own viewport-fixed rect.
+    // ganttTimeline is position:fixed relative to the browser chrome so its
+    // getBoundingClientRect() is stable regardless of scroll position.
+    var r   = el.getBoundingClientRect();
+    var top = r.top;
+    var bot = Math.min(r.bottom, window.innerHeight);
+    var ZONE = 80;  // px zone inside boundary — start slow, accelerate toward boundary
+    var MAX  = 20;  // px/frame at the boundary
 
     var delta = 0;
-    if (cursorY < top) {
-      // Above the list — ratio 0 at boundary, 1 at ZONE px above boundary
-      var over = Math.min(top - cursorY, ZONE);
-      delta = -Math.round(MAX * (over / ZONE) * (over / ZONE));
-    } else if (cursorY > bot) {
-      // Below the list — ratio 0 at boundary, 1 at ZONE px below boundary
-      var over2 = Math.min(cursorY - bot, ZONE);
-      delta = Math.round(MAX * (over2 / ZONE) * (over2 / ZONE));
+    if (cursorY < top + ZONE) {
+      // Inside top zone — ratio 0 at ZONE edge, 1 at exact top boundary
+      var ratio = 1 - Math.max(0, cursorY - top) / ZONE;
+      delta = -Math.round(MAX * ratio * ratio);
+    } else if (cursorY > bot - ZONE) {
+      // Inside bottom zone
+      var ratio2 = 1 - Math.max(0, bot - cursorY) / ZONE;
+      delta = Math.round(MAX * ratio2 * ratio2);
     }
 
     if (delta !== 0) {
@@ -1266,7 +1264,7 @@ function initDrag() {
 
     if (!updates.length) return cleanupDrag();
     pendingReorder = { updates: updates };
-    showWritebar(dragState.opis, targetRow.dataset.opis, updates.length);
+    showWritebar(dragState.opis||'', targetRow.dataset.opis||'', updates.length);
     cleanupDrag();
     render();
     initDrag();
@@ -1441,7 +1439,7 @@ function cleanupDrag() {
 
 function showWritebar(fromName, toName, count) {
   document.getElementById('wbMsg').textContent =
-    `"${fromName.slice(0,28)}" → before "${toName.slice(0,28)}" · ${count} rows renumbered`;
+    `"${(fromName||'').slice(0,28)}" → before "${(toName||'').slice(0,28)}" · ${count} rows renumbered`;
   document.getElementById('writebar').classList.add('show');
 }
 
