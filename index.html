@@ -1198,12 +1198,6 @@ function initDrag() {
     return document.getElementById('ganttTimeline');
   }
 
-  // DEBUG OVERLAY — shows live values during drag, remove after fix
-  var dbg = document.createElement('div');
-  dbg.id = 'drag-dbg';
-  dbg.style.cssText = 'position:fixed;top:4px;right:4px;z-index:9999;background:rgba(0,0,0,.8);color:#0f0;font:11px monospace;padding:6px 10px;border-radius:4px;pointer-events:none;display:none;line-height:1.6';
-  document.body.appendChild(dbg);
-
   // Cache scroll boundaries on dragstart — measured once when layout is stable
   var _scrollTop = 0;   // viewport y of gantt top edge
   var _scrollBot = 0;   // viewport y of gantt bottom edge
@@ -1221,13 +1215,11 @@ function initDrag() {
     }
     _scrollTop = offsetTop;
     _scrollBot = Math.min(offsetTop + el.clientHeight, window.innerHeight);
-    dbg.textContent = 'cached top='+_scrollTop+' bot='+_scrollBot;
-    dbg.style.display = 'block';
-    setTimeout(function(){ dbg.style.display='none'; }, 2000);
+
   }
 
   function tick() {
-    if (!dragState) { rafId = null; dbg.style.display='none'; return; }
+    if (!dragState) { rafId = null; return; }
     rafId = requestAnimationFrame(tick);
     if (cursorY < 0) return;
 
@@ -1246,9 +1238,6 @@ function initDrag() {
       var ratio2 = 1 - Math.max(0, bot - cursorY) / ZONE;
       delta = Math.max(1, Math.round(MAX * ratio2));
     }
-
-    dbg.style.display = 'block';
-    dbg.textContent = 'y='+cursorY+' top='+top+' bot='+bot+' Δ='+delta+' scroll='+el.scrollTop;
 
     if (delta !== 0) {
       el.scrollTop += delta;
