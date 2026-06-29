@@ -1219,9 +1219,6 @@ function initDrag() {
 
   // ── Auto-scroll during drag (desktop) ────────────────────────────────────
   // Use document-level dragover instead of 'drag' — dragover always has
-  // correct clientY, whereas 'drag' often reports 0,0 in many browsers.
-  let _scrollRaf = null;
-  let _lastDragY = 0;
 
   let _scrollRaf = null;
   let _lastDragY = -1; // -1 = uninitialised
