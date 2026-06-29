@@ -1212,6 +1212,9 @@ function initDrag() {
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setDragImage(ghost, 10, 10); } catch(err){}
     hideTT();
+    ensureScrollHotzones();
+    // Track cursor via mousemove as well — dragover stops firing over sticky headers
+    document.addEventListener('mousemove', onDocMouseMove);
   });
 
   // ── Auto-scroll during drag (desktop) ────────────────────────────────────
@@ -1223,29 +1226,47 @@ function initDrag() {
   let _scrollRaf = null;
   let _lastDragY = -1; // -1 = uninitialised
 
+  // Invisible hotzone divs pinned to top and bottom of the gantt for reliable scroll triggering
+  function ensureScrollHotzones(){
+    if (document.getElementById('scroll-hz-top')) return;
+    ['top','bottom'].forEach(pos=>{
+      const hz = document.createElement('div');
+      hz.id = 'scroll-hz-' + pos;
+      hz.style.cssText = `position:fixed;${pos}:0;left:0;right:0;height:120px;z-index:999;pointer-events:none;`;
+      document.body.appendChild(hz);
+    });
+  }
+
   function runAutoScroll(){
     if (!dragState) { _scrollRaf = null; return; }
-    const ZONE = 120;
-    const MAX  = 18;
+    const MAX  = 20;
+    const ZONE = 150;
     const y    = _lastDragY;
     const vh   = window.innerHeight;
 
     if (y >= 0) {
-      const timeline = document.getElementById('ganttTimeline');
+      const timeline   = document.getElementById('ganttTimeline');
       const mobileList = document.getElementById('mobile-list');
+      const ls         = document.getElementById('labelsScroll');
       let delta = 0;
-      if (y < ZONE)           delta = -MAX * Math.pow(1 - y / ZONE, 1.5);
-      else if (y > vh - ZONE) delta =  MAX * Math.pow(1 - (vh - y) / ZONE, 1.5);
+      if (y < ZONE)           delta = -MAX * Math.pow(1 - y / ZONE, 1.2);
+      else if (y > vh - ZONE) delta =  MAX * Math.pow(1 - (vh - y) / ZONE, 1.2);
 
-      if (delta !== 0) {
-        if (timeline)    timeline.scrollTop    += delta;
-        if (mobileList)  mobileList.scrollTop  += delta;
-        // Sync label panel manually since it's overflow:hidden
-        const ls = document.getElementById('labelsScroll');
+      if (Math.abs(delta) > 0.5) {
+        if (timeline)   { timeline.scrollTop   += delta; }
+        if (mobileList) { mobileList.scrollTop += delta; }
         if (ls && timeline) ls.scrollTop = timeline.scrollTop;
       }
     }
     _scrollRaf = requestAnimationFrame(runAutoScroll);
+  }
+
+  function onDocMouseMove(e){
+    if (!dragState) return;
+    _lastDragY = e.clientY;
+    ghost.style.left = (e.clientX + 14) + 'px';
+    ghost.style.top  = (e.clientY - 10) + 'px';
+    if (!_scrollRaf) _scrollRaf = requestAnimationFrame(runAutoScroll);
   }
 
   function onDocDragOver(e){
@@ -1256,10 +1277,12 @@ function initDrag() {
     if (!_scrollRaf) _scrollRaf = requestAnimationFrame(runAutoScroll);
   }
   document.addEventListener('dragover', onDocDragOver);
+  document.addEventListener('mousemove', onDocMouseMove);
 
   container.addEventListener('dragend', () => {
     if (_scrollRaf) { cancelAnimationFrame(_scrollRaf); _scrollRaf = null; }
     document.removeEventListener('dragover', onDocDragOver);
+    document.removeEventListener('mousemove', onDocMouseMove);
     cleanupDrag();
   });
 
