@@ -475,13 +475,7 @@ let viewWeekOffset = 0;
 // ── DATE UTILS ────────────────────────────────────────────────────────────────
 function getMonday(d){const r=new Date(d);r.setHours(0,0,0,0);const day=r.getDay();r.setDate(r.getDate()-(day===0?6:day-1));return r}
 function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r}
-function fmtISO(d){
-  // Use local year/month/day — toISOString() uses UTC which shifts the date in UTC+ timezones
-  const y=d.getFullYear();
-  const m=String(d.getMonth()+1).padStart(2,'0');
-  const day=String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
-}
+function fmtISO(d){return d.toISOString().split('T')[0]}
 function fmtDD(d){return d.toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'})}
 function fmtLong(d){return d.toLocaleDateString('pl-PL',{day:'numeric',month:'short',year:'numeric'})}
 function isWeekend(d){const w=d.getDay();return w===0||w===6}
@@ -556,7 +550,6 @@ function schedule(tasks){
   // No date: pin to today, consume today's capacity.
   tasks.filter(t=>t.status==='Zrobione').forEach(task=>{
     const pinDate=task.completedDate||today;
-    console.log('Scheduling Zrobione:',task.opis.slice(0,30),'completedDate:',task.completedDate,'pinDate:',fmtISO(pinDate));
     consume(pinDate,task.czas); // consumes capacity on that day
     results.push({
       ...task,
@@ -1032,9 +1025,6 @@ function loadFromSheets(){
           r.completedDate = isoM ? new Date(+isoM[1],+isoM[2]-1,+isoM[3]) : null;
         }
       });
-      // DEBUG — open browser console (F12) to see what's coming through
-      const doneRows=rows.filter(r=>r.status==='Zrobione');
-      console.log('Zrobione tasks received:',doneRows.map(r=>({opis:r.opis.slice(0,30),completedDate:r.completedDate,raw:r.completedDate})));
       rawData = rows;
 
       // Load capacity overrides from sheet — merge into dayHours (sheet wins over localStorage)
@@ -1195,52 +1185,8 @@ function initDrag() {
   const container = document.getElementById('labelRows');
   if (!container) return;
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  var scrollRaf  = null;
-  var lastDragY  = -1;
-  var touchState = null; // for mobile touch drag
-
-  // ── Auto-scroll (runs every frame while dragging) ─────────────────────────
-  function scrollStep() {
-    if (!dragState) { scrollRaf = null; return; }
-    var ZONE = 160, MAX = 20, y = lastDragY, vh = window.innerHeight;
-    if (y >= 0) {
-      var delta = 0;
-      if (y < ZONE)        delta = -MAX * Math.pow(1 - y / ZONE, 1.2);
-      else if (y > vh - ZONE) delta = MAX * Math.pow(1 - (vh - y) / ZONE, 1.2);
-      if (Math.abs(delta) > 0.5) {
-        var tl = document.getElementById('ganttTimeline');
-        var ml = document.getElementById('mobile-list');
-        var ls = document.getElementById('labelsScroll');
-        if (tl) tl.scrollTop += delta;
-        if (ml) ml.scrollTop += delta;
-        if (ls && tl) ls.scrollTop = tl.scrollTop;
-      }
-    }
-    scrollRaf = requestAnimationFrame(scrollStep);
-  }
-
-  function startScrollLoop() {
-    if (!scrollRaf) scrollRaf = requestAnimationFrame(scrollStep);
-  }
-  function stopScrollLoop() {
-    if (scrollRaf) { cancelAnimationFrame(scrollRaf); scrollRaf = null; }
-  }
-
-  // ── Track cursor position (both dragover AND mousemove for full coverage) ──
-  function onMove(e) {
-    if (!dragState) return;
-    var clientX = e.clientX !== undefined ? e.clientX : (e.touches ? e.touches[0].clientX : 0);
-    var clientY = e.clientY !== undefined ? e.clientY : (e.touches ? e.touches[0].clientY : 0);
-    lastDragY = clientY;
-    ghost.style.left = (clientX + 14) + 'px';
-    ghost.style.top  = (clientY - 10) + 'px';
-    startScrollLoop();
-  }
-
-  // ── Desktop drag events ────────────────────────────────────────────────────
-  container.addEventListener('dragstart', function(e) {
-    var row = e.target.closest('[draggable=true][data-etap]');
+  container.addEventListener('dragstart', e => {
+    const row = e.target.closest('[draggable=true][data-etap]');
     if (!row) return;
     dragState = {
       etap: parseFloat(row.dataset.etap),
@@ -1252,155 +1198,103 @@ function initDrag() {
     ghost.textContent = row.dataset.opis;
     ghost.style.display = 'block';
     ghost.style.left = '-9999px';
-    ghost.style.top  = '-9999px';
+    ghost.style.top = '-9999px';
     e.dataTransfer.effectAllowed = 'move';
-    try { e.dataTransfer.setDragImage(ghost, 10, 10); } catch(err) {}
+    try { e.dataTransfer.setDragImage(ghost, 10, 10); } catch(err){}
     hideTT();
-    document.addEventListener('dragover', onMove);
-    document.addEventListener('mousemove', onMove);
-    startScrollLoop();
   });
 
-  container.addEventListener('dragover', function(e) {
+  container.addEventListener('drag', e => {
+    if (e.clientX === 0 && e.clientY === 0) return;
+    ghost.style.left = (e.clientX + 14) + 'px';
+    ghost.style.top  = (e.clientY - 10) + 'px';
+  });
+
+  container.addEventListener('dragover', e => {
     if (!dragState) return;
-    var row = e.target.closest('[draggable=true][data-etap]');
+    const row = e.target.closest('[draggable=true][data-etap]');
     if (!row) return;
-    if (parseFloat(row.dataset.etap) === dragState.etap &&
-        parseFloat(row.dataset.item) === dragState.item) return;
+    // Same item on same stage — no-op
+    if (parseFloat(row.dataset.etap) === dragState.etap && parseFloat(row.dataset.item) === dragState.item) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    document.querySelectorAll('.drop-target').forEach(function(el) { el.classList.remove('drop-target'); });
+    document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
     row.classList.add('drop-target');
   });
 
-  container.addEventListener('dragleave', function(e) {
-    var row = e.target.closest('[draggable=true][data-etap]');
+  container.addEventListener('dragleave', e => {
+    const row = e.target.closest('[draggable=true][data-etap]');
     if (row) row.classList.remove('drop-target');
   });
 
-  container.addEventListener('drop', function(e) {
+  container.addEventListener('drop', e => {
     e.preventDefault();
-    var row = e.target.closest('[draggable=true][data-etap]');
-    handleDrop(row);
-  });
+    if (!dragState) return;
+    const targetRow = e.target.closest('[draggable=true][data-etap]');
+    if (!targetRow) return cleanupDrag();
 
-  container.addEventListener('dragend', function() {
-    stopScrollLoop();
-    document.removeEventListener('dragover', onMove);
-    document.removeEventListener('mousemove', onMove);
-    cleanupDrag();
-  });
+    const targetEtap = parseFloat(targetRow.dataset.etap);
+    const targetItem = parseFloat(targetRow.dataset.item);
+    const srcEtap    = dragState.etap;
+    const srcItem    = dragState.item;
 
-  // ── Mobile touch drag (long-press 400ms to initiate) ─────────────────────
-  container.addEventListener('touchstart', function(e) {
-    var row = e.target.closest('[draggable=true][data-etap]');
-    if (!row) return;
-    var t0 = e.touches[0];
-    touchState = {
-      row: row,
-      startX: t0.clientX, startY: t0.clientY,
-      timer: setTimeout(function() {
-        dragState = {
-          etap: parseFloat(row.dataset.etap),
-          item: parseFloat(row.dataset.item),
-          opis: row.dataset.opis,
-          sourceEl: row,
-        };
-        row.classList.add('drag-source');
-        ghost.textContent = row.dataset.opis;
-        ghost.style.display = 'block';
-        ghost.style.left = (t0.clientX + 14) + 'px';
-        ghost.style.top  = (t0.clientY - 10) + 'px';
-        if (navigator.vibrate) navigator.vibrate(40);
-        startScrollLoop();
-      }, 400),
-    };
-  }, {passive: true});
-
-  container.addEventListener('touchmove', function(e) {
-    if (!touchState) return;
-    var t = e.touches[0];
-    if (!dragState) {
-      // Cancel long-press if moved before 400ms
-      if (Math.abs(t.clientX - touchState.startX) > 8 ||
-          Math.abs(t.clientY - touchState.startY) > 8) {
-        clearTimeout(touchState.timer);
-        touchState = null;
-      }
-      return;
-    }
-    e.preventDefault();
-    lastDragY = t.clientY;
-    ghost.style.left = (t.clientX + 14) + 'px';
-    ghost.style.top  = (t.clientY - 10) + 'px';
-    // Highlight drop target under finger
-    ghost.style.display = 'none';
-    var el = document.elementFromPoint(t.clientX, t.clientY);
-    ghost.style.display = 'block';
-    document.querySelectorAll('.drop-target').forEach(function(x) { x.classList.remove('drop-target'); });
-    var trow = el && el.closest('[draggable=true][data-etap]');
-    if (trow && trow !== touchState.row) trow.classList.add('drop-target');
-  }, {passive: false});
-
-  container.addEventListener('touchend', function(e) {
-    if (!touchState) return;
-    clearTimeout(touchState.timer);
-    if (dragState) {
-      var t = e.changedTouches[0];
-      ghost.style.display = 'none';
-      var el = document.elementFromPoint(t.clientX, t.clientY);
-      ghost.style.display = 'none';
-      var trow = el && el.closest('[draggable=true][data-etap]');
-      stopScrollLoop();
-      if (trow && trow !== touchState.row) {
-        handleDrop(trow);
-      } else {
-        cleanupDrag();
-      }
-    }
-    touchState = null;
-  }, {passive: true});
-
-  // ── handleDrop: shared by mouse drop and touch end ─────────────────────────
-  function handleDrop(targetRow) {
-    if (!dragState || !targetRow) return cleanupDrag();
-    var targetEtap = parseFloat(targetRow.dataset.etap);
-    var targetItem = parseFloat(targetRow.dataset.item);
-    var srcEtap    = dragState.etap;
-    var srcItem    = dragState.item;
+    // Drop on itself — no-op
     if (targetEtap === srcEtap && targetItem === srcItem) return cleanupDrag();
 
-    var draggedRow = rawData.find(function(r) {
-      return r.etap === srcEtap && r.item === srcItem && r.typ !== 'ETAP';
-    });
+    // Find dragged row in rawData (match by etap + item — globally unique)
+    const draggedRow = rawData.find(r => r.etap === srcEtap && r.item === srcItem && r.typ !== 'ETAP');
     if (!draggedRow) return cleanupDrag();
 
-    var draggedOpis  = draggedRow.opis;
-    var stableUpdates = [];
-    var newRawData = rawData.map(function(r) {
+    // ── GLOBAL ITEM # RULE ────────────────────────────────────────────────────
+    // Item # is a GLOBAL sequence across all stages (not per-stage).
+    // Dragging X (srcItem) onto Y (targetItem):
+    //   • Every step with Item# >= targetItem, EXCEPT X itself → Item# += 1
+    //   • X itself → Item# = targetItem  (and Etap# = targetEtap if cross-stage)
+    //   • Every step with Item# < targetItem → unchanged
+    //
+    // This means X slots into Y's position; Y and everything after shift up by 1.
+    // X's old position just disappears — no gap-filling of the source.
+
+    const draggedOpis = draggedRow.opis; // unique task name — stable identity key
+
+    const stableUpdates = [];
+    let newRawData = rawData.map(r => {
+      // ETAP header rows and unnumbered rows are never touched
       if (r.typ === 'ETAP' || r.item == null) return r;
+
+      // ── This IS the dragged row X (matched by opis, globally unique) ──
+      // Only Item # changes — etap stays as-is so the bar keeps its stage colour
       if (r.opis === draggedOpis) {
-        stableUpdates.push({opis: r.opis, etap: r.etap, oldItem: r.item, newItem: targetItem});
-        return Object.assign({}, r, {item: targetItem});
+        stableUpdates.push({
+          opis: r.opis,
+          etap: r.etap, oldItem: r.item, newItem: targetItem,
+        });
+        return {...r, item: targetItem};
       }
+
+      // ── All other rows: shift up by 1 only if Item# >= targetItem ──
+      // Dragged row is excluded above so it never double-counts here.
       if (r.item >= targetItem) {
-        stableUpdates.push({opis: r.opis, etap: r.etap, oldItem: r.item, newItem: r.item + 1});
-        return Object.assign({}, r, {item: r.item + 1});
+        stableUpdates.push({ opis: r.opis, etap: r.etap, oldItem: r.item, newItem: r.item + 1 });
+        return {...r, item: r.item + 1};
       }
+
+      // Item# < targetItem → completely untouched
       return r;
     });
 
     if (!stableUpdates.length) return cleanupDrag();
+
     rawData = newRawData;
-    pendingReorder = {updates: stableUpdates};
+    pendingReorder = { updates: stableUpdates };
     render();
     initDrag();
     showWritebar(dragState.opis, targetRow.dataset.opis, stableUpdates.length);
     cleanupDrag();
-  }
+  });
 
+  container.addEventListener('dragend', () => cleanupDrag());
 }
-
 
 function cleanupDrag() {
   if (dragState && dragState.sourceEl) dragState.sourceEl.classList.remove('drag-source');
@@ -1674,7 +1568,7 @@ function renderMobile(){
     html='<div style="padding:32px 16px;text-align:center;color:var(--text-sec)">No tasks match.</div>';
   }
   sortedDays.forEach(dk=>{
-    const [dy,dm,dd]=dk.split('-').map(Number); const d=new Date(dy,dm-1,dd);
+    const d=new Date(dk+'T00:00:00');
     const isToday=dk===fmtISO(today);
     const dayLabel=isToday?'Dziś — '+DOW_FULL_PL[d.getDay()]:DOW_FULL_PL[d.getDay()];
     const cap=getDayAvail(dk);
