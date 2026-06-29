@@ -475,7 +475,13 @@ let viewWeekOffset = 0;
 // ── DATE UTILS ────────────────────────────────────────────────────────────────
 function getMonday(d){const r=new Date(d);r.setHours(0,0,0,0);const day=r.getDay();r.setDate(r.getDate()-(day===0?6:day-1));return r}
 function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r}
-function fmtISO(d){return d.toISOString().split('T')[0]}
+function fmtISO(d){
+  // Use local year/month/day — toISOString() uses UTC which shifts the date in UTC+ timezones
+  const y=d.getFullYear();
+  const m=String(d.getMonth()+1).padStart(2,'0');
+  const day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
 function fmtDD(d){return d.toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'})}
 function fmtLong(d){return d.toLocaleDateString('pl-PL',{day:'numeric',month:'short',year:'numeric'})}
 function isWeekend(d){const w=d.getDay();return w===0||w===6}
@@ -550,6 +556,7 @@ function schedule(tasks){
   // No date: pin to today, consume today's capacity.
   tasks.filter(t=>t.status==='Zrobione').forEach(task=>{
     const pinDate=task.completedDate||today;
+    console.log('Scheduling Zrobione:',task.opis.slice(0,30),'completedDate:',task.completedDate,'pinDate:',fmtISO(pinDate));
     consume(pinDate,task.czas); // consumes capacity on that day
     results.push({
       ...task,
@@ -1025,6 +1032,9 @@ function loadFromSheets(){
           r.completedDate = isoM ? new Date(+isoM[1],+isoM[2]-1,+isoM[3]) : null;
         }
       });
+      // DEBUG — open browser console (F12) to see what's coming through
+      const doneRows=rows.filter(r=>r.status==='Zrobione');
+      console.log('Zrobione tasks received:',doneRows.map(r=>({opis:r.opis.slice(0,30),completedDate:r.completedDate,raw:r.completedDate})));
       rawData = rows;
 
       // Load capacity overrides from sheet — merge into dayHours (sheet wins over localStorage)
@@ -1204,11 +1214,131 @@ function initDrag() {
     hideTT();
   });
 
-  container.addEventListener('drag', e => {
-    if (e.clientX === 0 && e.clientY === 0) return;
+  // ── Auto-scroll during drag (desktop) ────────────────────────────────────
+  // Use document-level dragover instead of 'drag' — dragover always has
+  // correct clientY, whereas 'drag' often reports 0,0 in many browsers.
+  let _scrollRaf = null;
+  let _lastDragY = 0;
+
+  function runAutoScroll(){
+    const ZONE = 100;
+    const MAX  = 16;
+    const y    = _lastDragY;
+    const vh   = window.innerHeight;
+    const labelScroll    = document.getElementById('labelsScroll');
+    const timelineScroll = document.getElementById('ganttTimeline');
+    const mobileList     = document.getElementById('mobile-list');
+    let delta = 0;
+    if (y > 0 && y < ZONE)        delta = -MAX * (1 - y / ZONE);
+    else if (y > vh - ZONE) delta =  MAX * (1 - (vh - y) / ZONE);
+    if (delta !== 0) {
+      if (labelScroll)    labelScroll.scrollTop    += delta;
+      if (timelineScroll) timelineScroll.scrollTop += delta;
+      if (mobileList)     mobileList.scrollTop     += delta;
+    }
+    // Always re-queue while dragging — delta may become non-zero again as cursor moves
+    if (dragState) _scrollRaf = requestAnimationFrame(runAutoScroll);
+    else _scrollRaf = null;
+  }
+
+  function onDocDragOver(e){
+    if (!dragState) return;
+    _lastDragY = e.clientY;
     ghost.style.left = (e.clientX + 14) + 'px';
     ghost.style.top  = (e.clientY - 10) + 'px';
+    // Start the loop once — it self-sustains via requestAnimationFrame while dragState exists
+    if (!_scrollRaf) _scrollRaf = requestAnimationFrame(runAutoScroll);
+  }
+  document.addEventListener('dragover', onDocDragOver);
+
+  container.addEventListener('dragend', () => {
+    if (_scrollRaf) { cancelAnimationFrame(_scrollRaf); _scrollRaf = null; }
+    document.removeEventListener('dragover', onDocDragOver);
+    cleanupDrag();
   });
+
+  // ── Touch drag (mobile) ───────────────────────────────────────────────────
+  // HTML5 drag API doesn't fire on mobile — implement via touch events.
+  let _touchDragState = null;
+
+  container.addEventListener('touchstart', e => {
+    const row = e.target.closest('[draggable=true][data-etap]');
+    if (!row) return;
+    // Long-press (400ms) to initiate drag
+    const t = e.touches[0];
+    _touchDragState = {
+      row, timer: setTimeout(()=>{
+        dragState = {
+          etap: parseFloat(row.dataset.etap),
+          item: parseFloat(row.dataset.item),
+          opis: row.dataset.opis,
+          sourceEl: row,
+        };
+        row.classList.add('drag-source');
+        ghost.textContent = row.dataset.opis;
+        ghost.style.display = 'block';
+        ghost.style.left = (t.clientX + 14) + 'px';
+        ghost.style.top  = (t.clientY - 10) + 'px';
+        // Vibrate to confirm drag started
+        if (navigator.vibrate) navigator.vibrate(40);
+        _scrollRaf = requestAnimationFrame(runAutoScroll);
+      }, 400),
+      startX: t.clientX, startY: t.clientY,
+    };
+  }, {passive: true});
+
+  container.addEventListener('touchmove', e => {
+    if (!_touchDragState) return;
+    const t = e.touches[0];
+    // Cancel long-press if finger moved significantly before 400ms
+    if (!dragState) {
+      const dx = Math.abs(t.clientX - _touchDragState.startX);
+      const dy = Math.abs(t.clientY - _touchDragState.startY);
+      if (dx > 8 || dy > 8) {
+        clearTimeout(_touchDragState.timer);
+        _touchDragState = null;
+        return;
+      }
+      return;
+    }
+    e.preventDefault(); // prevent page scroll once drag is active
+    _lastDragY = t.clientY;
+    ghost.style.left = (t.clientX + 14) + 'px';
+    ghost.style.top  = (t.clientY - 10) + 'px';
+    // Highlight drop target under finger
+    ghost.style.display = 'none';
+    const elBelow = document.elementFromPoint(t.clientX, t.clientY);
+    ghost.style.display = 'block';
+    document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+    const targetRow = elBelow && elBelow.closest('[draggable=true][data-etap]');
+    if (targetRow && targetRow !== _touchDragState.row) targetRow.classList.add('drop-target');
+  }, {passive: false});
+
+  container.addEventListener('touchend', e => {
+    if (!_touchDragState) return;
+    clearTimeout(_touchDragState.timer);
+    if (dragState) {
+      // Find element under finger
+      const t = e.changedTouches[0];
+      ghost.style.display = 'none';
+      const elBelow = document.elementFromPoint(t.clientX, t.clientY);
+      ghost.style.display = 'none';
+      const targetRow = elBelow && elBelow.closest('[draggable=true][data-etap]');
+      if (targetRow && targetRow !== _touchDragState.row) {
+        // Simulate drop by dispatching to the drop handler directly
+        const fakeE = {
+          preventDefault: ()=>{},
+          target: targetRow,
+        };
+        // Call drop logic directly
+        handleDrop(targetRow);
+      } else {
+        if (_scrollRaf) { cancelAnimationFrame(_scrollRaf); _scrollRaf = null; }
+        cleanupDrag();
+      }
+    }
+    _touchDragState = null;
+  }, {passive: true});
 
   container.addEventListener('dragover', e => {
     if (!dragState) return;
@@ -1227,10 +1357,8 @@ function initDrag() {
     if (row) row.classList.remove('drop-target');
   });
 
-  container.addEventListener('drop', e => {
-    e.preventDefault();
+  function handleDrop(targetRow){
     if (!dragState) return;
-    const targetRow = e.target.closest('[draggable=true][data-etap]');
     if (!targetRow) return cleanupDrag();
 
     const targetEtap = parseFloat(targetRow.dataset.etap);
@@ -1291,9 +1419,15 @@ function initDrag() {
     initDrag();
     showWritebar(dragState.opis, targetRow.dataset.opis, stableUpdates.length);
     cleanupDrag();
+    if (_scrollRaf) { cancelAnimationFrame(_scrollRaf); _scrollRaf = null; }
+  }
+
+  container.addEventListener('drop', e => {
+    e.preventDefault();
+    const targetRow = e.target.closest('[draggable=true][data-etap]');
+    handleDrop(targetRow);
   });
 
-  container.addEventListener('dragend', () => cleanupDrag());
 }
 
 function cleanupDrag() {
@@ -1568,7 +1702,7 @@ function renderMobile(){
     html='<div style="padding:32px 16px;text-align:center;color:var(--text-sec)">No tasks match.</div>';
   }
   sortedDays.forEach(dk=>{
-    const d=new Date(dk+'T00:00:00');
+    const [dy,dm,dd]=dk.split('-').map(Number); const d=new Date(dy,dm-1,dd);
     const isToday=dk===fmtISO(today);
     const dayLabel=isToday?'Dziś — '+DOW_FULL_PL[d.getDay()]:DOW_FULL_PL[d.getDay()];
     const cap=getDayAvail(dk);
