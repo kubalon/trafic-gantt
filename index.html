@@ -1214,45 +1214,129 @@ function initDrag() {
     hideTT();
   });
 
+  // ── Auto-scroll during drag (desktop) ────────────────────────────────────
+  // Use document-level dragover instead of 'drag' — dragover always has
+  // correct clientY, whereas 'drag' often reports 0,0 in many browsers.
   let _scrollRaf = null;
-  container.addEventListener('drag', e => {
-    if (e.clientX === 0 && e.clientY === 0) return;
-    ghost.style.left = (e.clientX + 14) + 'px';
-    ghost.style.top  = (e.clientY - 10) + 'px';
+  let _lastDragY = 0;
 
-    if (_scrollRaf) { cancelAnimationFrame(_scrollRaf); _scrollRaf = null; }
-
-    const ZONE = 100;  // px from viewport edge to trigger scroll
-    const MAX  = 14;   // max px per frame
-    const y    = e.clientY;
+  function runAutoScroll(){
+    const ZONE = 100;
+    const MAX  = 16;
+    const y    = _lastDragY;
     const vh   = window.innerHeight;
-
-    // Scroll both the label panel and timeline panel together
     const labelScroll    = document.getElementById('labelsScroll');
     const timelineScroll = document.getElementById('ganttTimeline');
     const mobileList     = document.getElementById('mobile-list');
-
-    function autoScroll(){
-      let delta = 0;
-      if (y < ZONE)       delta = -MAX * (1 - y / ZONE);
-      else if (y > vh - ZONE) delta =  MAX * (1 - (vh - y) / ZONE);
-
-      if (delta !== 0) {
-        if (labelScroll)    labelScroll.scrollTop    += delta;
-        if (timelineScroll) timelineScroll.scrollTop += delta;
-        if (mobileList)     mobileList.scrollTop     += delta;
-        _scrollRaf = requestAnimationFrame(autoScroll);
-      }
+    let delta = 0;
+    if (y < ZONE)        delta = -MAX * (1 - y / ZONE);
+    else if (y > vh - ZONE) delta =  MAX * (1 - (vh - y) / ZONE);
+    if (delta !== 0) {
+      if (labelScroll)    labelScroll.scrollTop    += delta;
+      if (timelineScroll) timelineScroll.scrollTop += delta;
+      if (mobileList)     mobileList.scrollTop     += delta;
     }
-    if (y < ZONE || y > vh - ZONE) {
-      _scrollRaf = requestAnimationFrame(autoScroll);
-    }
-  });
+    if (dragState) _scrollRaf = requestAnimationFrame(runAutoScroll);
+  }
+
+  function onDocDragOver(e){
+    if (!dragState) return;
+    _lastDragY = e.clientY;
+    // Move ghost
+    ghost.style.left = (e.clientX + 14) + 'px';
+    ghost.style.top  = (e.clientY - 10) + 'px';
+    if (!_scrollRaf) _scrollRaf = requestAnimationFrame(runAutoScroll);
+  }
+  document.addEventListener('dragover', onDocDragOver);
 
   container.addEventListener('dragend', () => {
     if (_scrollRaf) { cancelAnimationFrame(_scrollRaf); _scrollRaf = null; }
+    document.removeEventListener('dragover', onDocDragOver);
     cleanupDrag();
   });
+
+  // ── Touch drag (mobile) ───────────────────────────────────────────────────
+  // HTML5 drag API doesn't fire on mobile — implement via touch events.
+  let _touchDragState = null;
+
+  container.addEventListener('touchstart', e => {
+    const row = e.target.closest('[draggable=true][data-etap]');
+    if (!row) return;
+    // Long-press (400ms) to initiate drag
+    const t = e.touches[0];
+    _touchDragState = {
+      row, timer: setTimeout(()=>{
+        dragState = {
+          etap: parseFloat(row.dataset.etap),
+          item: parseFloat(row.dataset.item),
+          opis: row.dataset.opis,
+          sourceEl: row,
+        };
+        row.classList.add('drag-source');
+        ghost.textContent = row.dataset.opis;
+        ghost.style.display = 'block';
+        ghost.style.left = (t.clientX + 14) + 'px';
+        ghost.style.top  = (t.clientY - 10) + 'px';
+        // Vibrate to confirm drag started
+        if (navigator.vibrate) navigator.vibrate(40);
+        _scrollRaf = requestAnimationFrame(runAutoScroll);
+      }, 400),
+      startX: t.clientX, startY: t.clientY,
+    };
+  }, {passive: true});
+
+  container.addEventListener('touchmove', e => {
+    if (!_touchDragState) return;
+    const t = e.touches[0];
+    // Cancel long-press if finger moved significantly before 400ms
+    if (!dragState) {
+      const dx = Math.abs(t.clientX - _touchDragState.startX);
+      const dy = Math.abs(t.clientY - _touchDragState.startY);
+      if (dx > 8 || dy > 8) {
+        clearTimeout(_touchDragState.timer);
+        _touchDragState = null;
+        return;
+      }
+      return;
+    }
+    e.preventDefault(); // prevent page scroll once drag is active
+    _lastDragY = t.clientY;
+    ghost.style.left = (t.clientX + 14) + 'px';
+    ghost.style.top  = (t.clientY - 10) + 'px';
+    // Highlight drop target under finger
+    ghost.style.display = 'none';
+    const elBelow = document.elementFromPoint(t.clientX, t.clientY);
+    ghost.style.display = 'block';
+    document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+    const targetRow = elBelow && elBelow.closest('[draggable=true][data-etap]');
+    if (targetRow && targetRow !== _touchDragState.row) targetRow.classList.add('drop-target');
+  }, {passive: false});
+
+  container.addEventListener('touchend', e => {
+    if (!_touchDragState) return;
+    clearTimeout(_touchDragState.timer);
+    if (dragState) {
+      // Find element under finger
+      const t = e.changedTouches[0];
+      ghost.style.display = 'none';
+      const elBelow = document.elementFromPoint(t.clientX, t.clientY);
+      ghost.style.display = 'none';
+      const targetRow = elBelow && elBelow.closest('[draggable=true][data-etap]');
+      if (targetRow && targetRow !== _touchDragState.row) {
+        // Simulate drop by dispatching to the drop handler directly
+        const fakeE = {
+          preventDefault: ()=>{},
+          target: targetRow,
+        };
+        // Call drop logic directly
+        handleDrop(targetRow);
+      } else {
+        if (_scrollRaf) { cancelAnimationFrame(_scrollRaf); _scrollRaf = null; }
+        cleanupDrag();
+      }
+    }
+    _touchDragState = null;
+  }, {passive: true});
 
   container.addEventListener('dragover', e => {
     if (!dragState) return;
@@ -1271,10 +1355,8 @@ function initDrag() {
     if (row) row.classList.remove('drop-target');
   });
 
-  container.addEventListener('drop', e => {
-    e.preventDefault();
+  function handleDrop(targetRow){
     if (!dragState) return;
-    const targetRow = e.target.closest('[draggable=true][data-etap]');
     if (!targetRow) return cleanupDrag();
 
     const targetEtap = parseFloat(targetRow.dataset.etap);
@@ -1335,6 +1417,13 @@ function initDrag() {
     initDrag();
     showWritebar(dragState.opis, targetRow.dataset.opis, stableUpdates.length);
     cleanupDrag();
+    if (_scrollRaf) { cancelAnimationFrame(_scrollRaf); _scrollRaf = null; }
+  }
+
+  container.addEventListener('drop', e => {
+    e.preventDefault();
+    const targetRow = e.target.closest('[draggable=true][data-etap]');
+    handleDrop(targetRow);
   });
 
 }
