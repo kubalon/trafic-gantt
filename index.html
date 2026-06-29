@@ -1032,9 +1032,6 @@ function loadFromSheets(){
           r.completedDate = isoM ? new Date(+isoM[1],+isoM[2]-1,+isoM[3]) : null;
         }
       });
-      // DEBUG — open browser console (F12) to see what's coming through
-      const doneRows=rows.filter(r=>r.status==='Zrobione');
-      console.log('Zrobione tasks received:',doneRows.map(r=>({opis:r.opis.slice(0,30),completedDate:r.completedDate,raw:r.completedDate})));
       rawData = rows;
 
       // Load capacity overrides from sheet — merge into dayHours (sheet wins over localStorage)
@@ -1213,22 +1210,24 @@ function initDrag() {
 
     var el = getScrollEl();
     if (!el) return;
-    // For top boundary use #timelineRows (excludes sticky column headers inside #ganttTimeline)
+    // top = first task row (below sticky headers); bot = visible bottom of scroll container
     var rowsEl = document.getElementById('timelineRows') || el;
-    var rRows  = rowsEl.getBoundingClientRect();
-    var rEl    = el.getBoundingClientRect();
-    var top  = Math.max(rRows.top, 0);               // first visible task row
-    var bot  = Math.min(rEl.bottom, window.innerHeight); // visible bottom of scroller
-    var ZONE = 120; // px — scroll zone depth from each edge
-    var MAX  = 22;  // px/frame at the boundary
+    var top = Math.max(rowsEl.getBoundingClientRect().top, 0);
+    var bot = Math.min(el.getBoundingClientRect().bottom, window.innerHeight);
+    // ZONE: how many px OUTSIDE the boundary before reaching max speed
+    // Scroll starts the instant cursor crosses top/bot, accelerates as it goes further outside
+    var ZONE = 80;  // px outside boundary = full speed
+    var MAX  = 20;  // px/frame at max
 
     var delta = 0;
-    if (cursorY < top + ZONE) {
-      var ratio = 1 - Math.max(0, cursorY - top) / ZONE;  // 1 at top edge, 0 at zone far end
-      delta = -Math.round(MAX * ratio * ratio);             // quadratic: slow entering, fast at edge
-    } else if (cursorY > bot - ZONE) {
-      var ratio2 = 1 - Math.max(0, bot - cursorY) / ZONE;
-      delta = Math.round(MAX * ratio2 * ratio2);
+    if (cursorY < top) {
+      // Above the list — ratio 0 at boundary, 1 at ZONE px above boundary
+      var over = Math.min(top - cursorY, ZONE);
+      delta = -Math.round(MAX * (over / ZONE) * (over / ZONE));
+    } else if (cursorY > bot) {
+      // Below the list — ratio 0 at boundary, 1 at ZONE px below boundary
+      var over2 = Math.min(cursorY - bot, ZONE);
+      delta = Math.round(MAX * (over2 / ZONE) * (over2 / ZONE));
     }
 
     if (delta !== 0) {
@@ -1343,33 +1342,50 @@ function initDrag() {
     el.addEventListener('touchend',   fns.onTE, { passive: true });
   }
 
+  // Touch drag: long-press 300ms to initiate, then drag freely
+  // touchPend tracks the pending long-press; once dragState is set, drag is live
+
   function onTS(e) {
     var row = e.target.closest('[data-etap][data-item]');
-    if (!row) return;
+    if (!row || dragState) return;
     var t = e.touches[0];
     touchPend = {
-      row: row, x0: t.clientX, y0: t.clientY,
-      timer: setTimeout(function() {
-        dragState = { etap: parseFloat(row.dataset.etap), item: parseFloat(row.dataset.item), opis: row.dataset.opis, sourceEl: row };
+      row:    row,
+      x0:     t.clientX,
+      y0:     t.clientY,
+      lastX:  t.clientX,
+      lastY:  t.clientY,
+      timer:  setTimeout(function() {
+        if (!touchPend) return;
+        dragState = {
+          etap:     parseFloat(row.dataset.etap),
+          item:     parseFloat(row.dataset.item),
+          opis:     row.dataset.opis || '',
+          sourceEl: row
+        };
         row.classList.add('drag-source');
-        var label = row.dataset.opis || (row.querySelector('.mb-task-name')||{}).textContent || '';
-        ghost.textContent = label;
+        ghost.textContent = dragState.opis || (row.querySelector('.mb-task-name,label') || {}).textContent || '';
+        ghost.style.cssText = ghost.style.cssText; // force repaint
         ghost.style.display = 'block';
-        ghost.style.left = (t.clientX + 14) + 'px';
-        ghost.style.top  = (t.clientY - 10) + 'px';
-        if (navigator.vibrate) navigator.vibrate(50);
-        cursorY = t.clientY;
+        ghost.style.left = (touchPend.lastX + 14) + 'px';
+        ghost.style.top  = (touchPend.lastY - 10) + 'px';
+        if (navigator.vibrate) navigator.vibrate(40);
+        cursorY = touchPend.lastY;
         startTick();
-      }, 450),
+      }, 300)
     };
   }
 
   function onTM(e) {
     if (!touchPend) return;
     var t = e.touches[0];
+    touchPend.lastX = t.clientX;
+    touchPend.lastY = t.clientY;
     if (!dragState) {
-      if (Math.abs(t.clientX - touchPend.x0) > 8 || Math.abs(t.clientY - touchPend.y0) > 8) {
-        clearTimeout(touchPend.timer); touchPend = null;
+      // Cancel long-press if finger moved more than 10px before timer fires
+      if (Math.abs(t.clientX - touchPend.x0) > 10 || Math.abs(t.clientY - touchPend.y0) > 10) {
+        clearTimeout(touchPend.timer);
+        touchPend = null;
       }
       return;
     }
@@ -1377,9 +1393,10 @@ function initDrag() {
     cursorY = t.clientY;
     ghost.style.left = (t.clientX + 14) + 'px';
     ghost.style.top  = (t.clientY - 10) + 'px';
-    ghost.style.display = 'none';
+    // Find target under finger
+    ghost.style.visibility = 'hidden';
     var under = document.elementFromPoint(t.clientX, t.clientY);
-    ghost.style.display = 'block';
+    ghost.style.visibility = 'visible';
     document.querySelectorAll('.drop-target').forEach(function(x){ x.classList.remove('drop-target'); });
     var trow = under && under.closest('[data-etap][data-item]');
     if (trow && trow !== touchPend.row) trow.classList.add('drop-target');
@@ -1387,24 +1404,23 @@ function initDrag() {
 
   function onTE(e) {
     if (!touchPend) return;
-    clearTimeout(touchPend.timer);
     var pend = touchPend;
-    touchPend = null; // clear BEFORE execDrop to prevent re-entry
-    if (dragState) {
-      var t = e.changedTouches[0];
-      ghost.style.display = 'none'; // hide ghost BEFORE elementFromPoint
-      var under = document.elementFromPoint(t.clientX, t.clientY);
-      // ghost stays hidden — cleanupDrag/execDrop handle final cleanup
-      var trow = under && under.closest('[data-etap][data-item]');
-      stopTick();
-      cursorY = -1;
-      // Clear all drop highlights now
-      document.querySelectorAll('.drop-target').forEach(function(x){ x.classList.remove('drop-target'); });
-      if (trow && trow !== pend.row) {
-        execDrop(trow);
-      } else {
-        cleanupDrag();
-      }
+    touchPend = null;
+    clearTimeout(pend.timer);
+    if (!dragState) return; // long-press didn't fire yet — just a tap, ignore
+    var t = e.changedTouches[0];
+    stopTick();
+    cursorY = -1;
+    ghost.style.visibility = 'hidden';
+    var under = document.elementFromPoint(t.clientX, t.clientY);
+    ghost.style.display = 'none';
+    ghost.style.visibility = 'visible';
+    document.querySelectorAll('.drop-target').forEach(function(x){ x.classList.remove('drop-target'); });
+    var trow = under && under.closest('[data-etap][data-item]');
+    if (trow && trow !== pend.row) {
+      execDrop(trow);
+    } else {
+      cleanupDrag();
     }
   }
 
