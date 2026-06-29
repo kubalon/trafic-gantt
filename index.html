@@ -1220,25 +1220,32 @@ function initDrag() {
   let _scrollRaf = null;
   let _lastDragY = 0;
 
+  let _scrollRaf = null;
+  let _lastDragY = -1; // -1 = uninitialised
+
   function runAutoScroll(){
-    const ZONE = 100;
-    const MAX  = 16;
+    if (!dragState) { _scrollRaf = null; return; }
+    const ZONE = 120;
+    const MAX  = 18;
     const y    = _lastDragY;
     const vh   = window.innerHeight;
-    const labelScroll    = document.getElementById('labelsScroll');
-    const timelineScroll = document.getElementById('ganttTimeline');
-    const mobileList     = document.getElementById('mobile-list');
-    let delta = 0;
-    if (y > 0 && y < ZONE)        delta = -MAX * (1 - y / ZONE);
-    else if (y > vh - ZONE) delta =  MAX * (1 - (vh - y) / ZONE);
-    if (delta !== 0) {
-      if (labelScroll)    labelScroll.scrollTop    += delta;
-      if (timelineScroll) timelineScroll.scrollTop += delta;
-      if (mobileList)     mobileList.scrollTop     += delta;
+
+    if (y >= 0) {
+      const timeline = document.getElementById('ganttTimeline');
+      const mobileList = document.getElementById('mobile-list');
+      let delta = 0;
+      if (y < ZONE)           delta = -MAX * Math.pow(1 - y / ZONE, 1.5);
+      else if (y > vh - ZONE) delta =  MAX * Math.pow(1 - (vh - y) / ZONE, 1.5);
+
+      if (delta !== 0) {
+        if (timeline)    timeline.scrollTop    += delta;
+        if (mobileList)  mobileList.scrollTop  += delta;
+        // Sync label panel manually since it's overflow:hidden
+        const ls = document.getElementById('labelsScroll');
+        if (ls && timeline) ls.scrollTop = timeline.scrollTop;
+      }
     }
-    // Always re-queue while dragging — delta may become non-zero again as cursor moves
-    if (dragState) _scrollRaf = requestAnimationFrame(runAutoScroll);
-    else _scrollRaf = null;
+    _scrollRaf = requestAnimationFrame(runAutoScroll);
   }
 
   function onDocDragOver(e){
@@ -1246,7 +1253,6 @@ function initDrag() {
     _lastDragY = e.clientY;
     ghost.style.left = (e.clientX + 14) + 'px';
     ghost.style.top  = (e.clientY - 10) + 'px';
-    // Start the loop once — it self-sustains via requestAnimationFrame while dragState exists
     if (!_scrollRaf) _scrollRaf = requestAnimationFrame(runAutoScroll);
   }
   document.addEventListener('dragover', onDocDragOver);
@@ -1303,8 +1309,7 @@ function initDrag() {
     }
     e.preventDefault(); // prevent page scroll once drag is active
     _lastDragY = t.clientY;
-    ghost.style.left = (t.clientX + 14) + 'px';
-    ghost.style.top  = (t.clientY - 10) + 'px';
+    ghost.style.left = (t.clientX + 14) + 'px';    ghost.style.top  = (t.clientY - 10) + 'px';
     // Highlight drop target under finger
     ghost.style.display = 'none';
     const elBelow = document.elementFromPoint(t.clientX, t.clientY);
