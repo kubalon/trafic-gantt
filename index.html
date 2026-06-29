@@ -1201,26 +1201,40 @@ function initDrag() {
   var touchState = null; // for mobile touch drag
 
   // ── Auto-scroll (runs every frame while dragging) ─────────────────────────
+  // Triggers ONLY when cursor is at the very top or bottom edge of the visible list.
+  // Uses the intersection of the scroll container rect with the viewport.
+  var _listRect = null; // cached on dragstart, recomputed each drag
+
+  function getListRect() {
+    var tl = document.getElementById('ganttTimeline');
+    var ml = document.getElementById('mobile-list');
+    var el = (ml && ml.offsetParent) ? ml : tl;
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    // Clamp to actual viewport so sticky headers and off-screen bottom are excluded
+    return {
+      top:    Math.max(r.top, 0),
+      bottom: Math.min(r.bottom, window.innerHeight),
+    };
+  }
+
   function scrollStep() {
     if (!dragState) { scrollRaf = null; return; }
+    var rect = _listRect || getListRect();
+    if (!rect) { scrollRaf = requestAnimationFrame(scrollStep); return; }
 
-    // Get the bounding rect of the actual scrollable list container
-    var tl   = document.getElementById('ganttTimeline');
-    var ml   = document.getElementById('mobile-list');
-    var ls   = document.getElementById('labelsScroll');
-    var scrollEl = (tl && tl.offsetParent) ? tl : ml;
-    if (!scrollEl) { scrollRaf = requestAnimationFrame(scrollStep); return; }
-
-    var rect  = scrollEl.getBoundingClientRect();
-    var y     = lastDragY;
-    var EDGE  = 6;   // px — trigger zone right at the border
-    var MAX   = 18;  // px per frame max speed
+    var y    = lastDragY;
+    var EDGE = 4;   // px band right at the border edge
+    var SPD  = 16;  // px per frame
 
     var delta = 0;
-    if (y < rect.top + EDGE)         delta = -MAX; // cursor above list top edge
-    else if (y > rect.bottom - EDGE) delta =  MAX; // cursor below list bottom edge
+    if      (y <= rect.top    + EDGE) delta = -SPD;
+    else if (y >= rect.bottom - EDGE) delta =  SPD;
 
     if (delta !== 0) {
+      var tl = document.getElementById('ganttTimeline');
+      var ml = document.getElementById('mobile-list');
+      var ls = document.getElementById('labelsScroll');
       if (tl) tl.scrollTop += delta;
       if (ml) ml.scrollTop += delta;
       if (ls && tl) ls.scrollTop = tl.scrollTop;
@@ -1264,6 +1278,7 @@ function initDrag() {
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setDragImage(ghost, 10, 10); } catch(err) {}
     hideTT();
+    _listRect = getListRect(); // cache before drag ghost affects layout
     document.addEventListener('dragover', onMove);
     document.addEventListener('mousemove', onMove);
     startScrollLoop();
@@ -1294,6 +1309,7 @@ function initDrag() {
 
   container.addEventListener('dragend', function() {
     stopScrollLoop();
+    _listRect = null;
     document.removeEventListener('dragover', onMove);
     document.removeEventListener('mousemove', onMove);
     cleanupDrag();
