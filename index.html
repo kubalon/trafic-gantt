@@ -1229,22 +1229,24 @@ function initDrag() {
     const timelineScroll = document.getElementById('ganttTimeline');
     const mobileList     = document.getElementById('mobile-list');
     let delta = 0;
-    if (y < ZONE)        delta = -MAX * (1 - y / ZONE);
+    if (y > 0 && y < ZONE)        delta = -MAX * (1 - y / ZONE);
     else if (y > vh - ZONE) delta =  MAX * (1 - (vh - y) / ZONE);
     if (delta !== 0) {
       if (labelScroll)    labelScroll.scrollTop    += delta;
       if (timelineScroll) timelineScroll.scrollTop += delta;
       if (mobileList)     mobileList.scrollTop     += delta;
     }
+    // Always re-queue while dragging — delta may become non-zero again as cursor moves
     if (dragState) _scrollRaf = requestAnimationFrame(runAutoScroll);
+    else _scrollRaf = null;
   }
 
   function onDocDragOver(e){
     if (!dragState) return;
     _lastDragY = e.clientY;
-    // Move ghost
     ghost.style.left = (e.clientX + 14) + 'px';
     ghost.style.top  = (e.clientY - 10) + 'px';
+    // Start the loop once — it self-sustains via requestAnimationFrame while dragState exists
     if (!_scrollRaf) _scrollRaf = requestAnimationFrame(runAutoScroll);
   }
   document.addEventListener('dragover', onDocDragOver);
